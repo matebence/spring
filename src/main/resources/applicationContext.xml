@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+	
+	<bean 
+	  id="indexService" 
+	  class="com.bence.mate.spring.xml.IndexService">
+	  <constructor-arg index="0" value="12"></constructor-arg>
+  	</bean>
+  	
+	<!-- ==================================================================== -->
+  	
+	<bean 
+	  id="indexApp" 
+	  class="com.bence.mate.spring.xml.IndexApp" >
+	    <property name="service" ref="indexService" />
+	</bean>
+
+	<!-- ==================================================================== -->
+	
+	<bean 
+	  id="springApp" 
+	  class="com.bence.mate.spring.xml.SpringApp">
+	    <constructor-arg ref="indexService" />
+	</bean>
+
+	<!-- ==================================================================== -->
+	
+	<bean id="staticMessageService"
+	  class="com.bence.mate.spring.xml.StaticServiceFactory"
+	  factory-method="getService">
+	    <constructor-arg value="1" />
+	</bean>
+	
+	<bean id="javaApp" class="com.bence.mate.spring.xml.JavaApp">
+	    <property name="service" ref="staticMessageService" />
+	</bean>
+	
+	<!-- ==================================================================== -->
+	
+	<bean id="indexServiceFactory" 
+	  class="com.bence.mate.spring.xml.InstanceServiceFactory" />
+	<bean id="messageService"
+	  class="com.bence.mate.spring.xml.InstanceServiceFactory"
+	  factory-method="getService" factory-bean="indexServiceFactory">
+	    <constructor-arg value="1" />
+	</bean>  
+
+	<bean id="xmlApp" class="com.bence.mate.spring.xml.XmlApp">
+	    <constructor-arg ref="messageService" />
+	</bean>
+</beans>
