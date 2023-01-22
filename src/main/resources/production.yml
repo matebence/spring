@@ -1,0 +1,3 @@
+app:
+  prod:
+    property: "Spring prod property"

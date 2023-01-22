@@ -2,52 +2,52 @@
 <beans xmlns="http://www.springframework.org/schema/beans"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
-	
-	<bean 
-	  id="indexService" 
-	  class="com.bence.mate.spring.xml.IndexService">
-	  <constructor-arg index="0" value="12"></constructor-arg>
-  	</bean>
-  	
-	<!-- ==================================================================== -->
-  	
-	<bean 
-	  id="indexApp" 
-	  class="com.bence.mate.spring.xml.IndexApp" >
-	    <property name="service" ref="indexService" />
+
+	<!-- Setting values -->
+
+	<bean id="springRespository"
+		class="com.bence.mate.spring.xml.repository.SpringRespository">
+		<constructor-arg index="0" value="12" />
 	</bean>
 
-	<!-- ==================================================================== -->
-	
-	<bean 
-	  id="springApp" 
-	  class="com.bence.mate.spring.xml.SpringApp">
-	    <constructor-arg ref="indexService" />
+	<!-- Setter injection -->
+
+	<bean id="elastic" class="com.bence.mate.spring.xml.Elastic">
+		<property name="abstractRepository" ref="springRespository" />
 	</bean>
 
-	<!-- ==================================================================== -->
-	
-	<bean id="staticMessageService"
-	  class="com.bence.mate.spring.xml.StaticServiceFactory"
-	  factory-method="getService">
-	    <constructor-arg value="1" />
-	</bean>
-	
-	<bean id="javaApp" class="com.bence.mate.spring.xml.JavaApp">
-	    <property name="service" ref="staticMessageService" />
-	</bean>
-	
-	<!-- ==================================================================== -->
-	
-	<bean id="indexServiceFactory" 
-	  class="com.bence.mate.spring.xml.InstanceServiceFactory" />
-	<bean id="messageService"
-	  class="com.bence.mate.spring.xml.InstanceServiceFactory"
-	  factory-method="getService" factory-bean="indexServiceFactory">
-	    <constructor-arg value="1" />
-	</bean>  
+	<!-- Construction injection -->
 
-	<bean id="xmlApp" class="com.bence.mate.spring.xml.XmlApp">
-	    <constructor-arg ref="messageService" />
+	<bean id="mySQL" class="com.bence.mate.spring.xml.MySQL">
+		<constructor-arg ref="springRespository" />
+	</bean>
+
+	<!-- Static Factory -->
+
+	<bean id="staticDatabaseFactory"
+		class="com.bence.mate.spring.xml.factory.StaticDatabaseFactory"
+		factory-method="getRepository">
+		<constructor-arg value="1" />
+	</bean>
+
+	<bean id="mongo" class="com.bence.mate.spring.xml.Mongo">
+		<property name="abstractRepository"
+			ref="staticDatabaseFactory" />
+	</bean>
+	
+	<!-- Factory -->
+	
+	<bean id="databaseFactory"
+		class="com.bence.mate.spring.xml.factory.DatabaseFactory">
+	</bean>
+
+	<bean id="databaseServiceFactory"
+		class="com.bence.mate.spring.xml.factory.DatabaseFactory"
+		factory-method="getRepository" factory-bean="databaseFactory">
+		<constructor-arg value="1" />
+	</bean>
+
+	<bean id="redis" class="com.bence.mate.spring.xml.Redis">
+		<constructor-arg ref="databaseServiceFactory" />
 	</bean>
 </beans>

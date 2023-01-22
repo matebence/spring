@@ -15,8 +15,8 @@ import org.slf4j.Logger;
 @Component
 @Scope(value = BeanDefinition.SCOPE_SINGLETON)
 public class SearchService {
-	
-	private static Logger logger = LoggerFactory.getLogger(SearchService.class); 
+
+	private static Logger logger = LoggerFactory.getLogger(SearchService.class);
 
 	@Autowired
 	@Qualifier(value = "binary")
@@ -26,11 +26,11 @@ public class SearchService {
 	public void postConstruct() {
 		logger.info("postConstruct");
 	}
-	
+
 	public boolean found(int[] haystack, int needle) {
 		return searchAlgorithm.found(haystack, needle);
 	}
-	
+
 	@PreDestroy
 	public void preDestroy() {
 		logger.info("preDestroy");

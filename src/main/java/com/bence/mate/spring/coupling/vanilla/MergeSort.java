@@ -4,6 +4,6 @@ public class MergeSort implements SortAlgorithm {
 
 	@Override
 	public int[] sort(int[] numbers) {
-		return new int[] {4,5,6};
+		return new int[] { 4, 5, 6 };
 	}
 }
