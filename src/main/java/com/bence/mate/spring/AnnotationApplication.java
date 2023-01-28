@@ -2,6 +2,8 @@ package com.bence.mate.spring;
 
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.ComponentScan;
 
 import com.bence.mate.spring.properties.PropertiesWithJavaConfig;
 
@@ -20,6 +22,8 @@ import java.util.Random;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
 
+@Configuration
+@ComponentScan(basePackages = { "com.bence.mate.spring" })
 public class AnnotationApplication {
 
 	private static Logger logger = LoggerFactory.getLogger(Application.class);
