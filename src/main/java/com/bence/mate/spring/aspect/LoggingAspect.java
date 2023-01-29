@@ -25,6 +25,7 @@ public class LoggingAspect {
 
 	// if Aspect and annotation are in the same package
 	// we don't have to prefix with package name
+	// if we have only one condition we can skip @Pointcut and use @Before etc ...
 	@Pointcut(value = "@annotation(com.bence.mate.spring.aspect.annotation.Log)")
 	public void logPointCut() {
 	}

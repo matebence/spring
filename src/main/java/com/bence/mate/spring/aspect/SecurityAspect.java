@@ -23,7 +23,8 @@ public class SecurityAspect {
 
 	private static Logger logger = LoggerFactory.getLogger(SecurityAspect.class);
 
-		@Pointcut(value = "within(com.bence.mate.spring.service.*)")
+		@Pointcut(value = "target(com.bence.mate.spring.service.EmailService)")
+	//	@Pointcut(value = "within(com.bence.mate.spring.service.*)")
 	//	@Pointcut(value = "execution(public char[] com.bence.mate.spring.service.EmailService.sendEmail(String))")  
 	//	@Pointcut(value = "execution(public char[] com.bence.mate.spring.service.EmailService.*(String))")  
 	//	@Pointcut(value = "execution(public char[] com.bence.mate.spring.service.EmailService.*(..))")  
