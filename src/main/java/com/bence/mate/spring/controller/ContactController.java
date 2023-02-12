@@ -31,11 +31,23 @@ public class ContactController {
 	 * also use the @RequestParam with the from name values log.info("{}", contact);
 	 * return new ModelAndView("redirect:/contact"); }
 	 */
+	
+	/*
+	 * @RequestMapping(value = "/saveMsg",method = RequestMethod.POST) public
+	 * ModelAndView saveMessage(@RequestParam(name="name") String
+	 * name, @RequestParam String mobileNum,
+	 * 
+	 * @RequestParam String email, @RequestParam String subject, @RequestParam
+	 * String message) { log.info("Name : " + name); log.info("Mobile Number : " +
+	 * mobileNum); log.info("Email Address : " + email); log.info("Subject : " +
+	 * subject); log.info("Message : " + message); return new
+	 * ModelAndView("redirect:/contact"); }
+	 */
 
 	@RequestMapping(value = "/saveMsg", method = RequestMethod.POST)
 	public String saveMessage(@Valid @ModelAttribute("contact") Contact contact, Errors errors) {
 		// It validates first and then it auto populates back the values to the view its
-		// like mode.addObject(contact)
+		// like model.addObject(contact). We would need to do the above steps again.
 		if (errors.hasErrors()) {
 			log.error("Contact form validation failed due to : " + errors.toString());
 			return "contact.html";

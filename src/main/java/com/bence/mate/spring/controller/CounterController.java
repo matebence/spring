@@ -1,14 +1,19 @@
 package com.bence.mate.spring.controller;
 
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.ModelAndView;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+
 import com.bence.mate.spring.service.ApplicationScopedCounterService;
 import com.bence.mate.spring.service.RequestScopedCounterService;
 import com.bence.mate.spring.service.SessionScopedCounterService;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Controller
 @RequestMapping(value = "/counter")
 public class CounterController {
@@ -44,5 +49,15 @@ public class CounterController {
 		sessionScopedCounterService.setCounter(sessionScopedCounterService.getCounter() + 1);
 		model.addAttribute("counter", sessionScopedCounterService.getCounter());
 		return "counter";
+	}
+
+	// It only catches the exceptions what are threw in this controller
+	@ExceptionHandler({ NullPointerException.class, ArrayIndexOutOfBoundsException.class })
+	public ModelAndView localExceptionHandler(Exception exception) {
+		ModelAndView errorPage = new ModelAndView();
+		errorPage.setViewName("error");
+		log.error(exception.getMessage());
+		errorPage.addObject("errormsg", exception.getMessage());
+		return errorPage;
 	}
 }
