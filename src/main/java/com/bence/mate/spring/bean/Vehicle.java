@@ -1,7 +1,10 @@
 package com.bence.mate.spring.bean;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
+//this will be injected if spring.profiles.active is equal to prod
+@Profile("prod")
 @Component(value = "vehicleComponent")
 public class Vehicle {
 

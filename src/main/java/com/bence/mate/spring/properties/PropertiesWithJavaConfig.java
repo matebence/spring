@@ -12,10 +12,16 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.LoggerFactory;
 import org.slf4j.Logger;
 
+/*
+Before we go into more advanced configuration options for properties, let's spend some time looking at the new properties support in Spring Boot.
+Generally speaking, this new support involves less configuration compared to standard Spring, which is of course one of the main goals of Boot.
+application.properties: the Default Property File
+*/
+
 @Component
 @PropertySource("classpath:development.properties")
 @PropertySource("classpath:application.properties")
-//@PropertySource({"classpath:persistence-${envTarget:mysql}.properties"})
+// @PropertySource("classpath:/application-${spring.profiles.active}.properties")
 //@PropertySources({
 //    @PropertySource("classpath:foo.properties"),
 //    @PropertySource("classpath:bar.properties")
