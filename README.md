@@ -6,6 +6,7 @@ docker run -d -p 3306:3306 --name mysql-docker-container -e MYSQL_ROOT_PASSWORD=
 ## Spring Data
 
 **ORM & data manipulation options**:
+
 - Repositories
 	- Repository
 		- makes possible to create custom repositories
@@ -27,7 +28,7 @@ docker run -d -p 3306:3306 --name mysql-docker-container -e MYSQL_ROOT_PASSWORD=
 	- NamedParameterJdbcTemplate
 	- Sort.by
 	- PageRequest.of
-Auditing
+- Auditing
 	- @CreatedDate
 	- @CreatedBy
 	- @LastModifiedDate
