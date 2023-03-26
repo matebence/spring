@@ -1,8 +1,37 @@
 ## Setting up MySQL Container
-
 ```bash
 docker run -d -p 3306:3306 --name mysql-docker-container -e MYSQL_ROOT_PASSWORD=spring -e MYSQL_DATABASE=spring -e MYSQL_USER=spring -e MYSQL_PASSWORD=spring mysql/mysql-server:latest
 ```
+
+## Spring Data
+
+**ORM & data manipulation options**:
+- Repositories
+	- Repository
+		- makes possible to create custom repositories
+	- JpaRepository
+	- PagingAndSortingRepository
+	- CrudRepository
+- Additional options
+	- QuerydslPredicateExecutor
+	- QueryByExampleExecutor
+- Querydsl
+	- used in repositories
+- Named queries
+	- referenced from entities in repositories
+- Native queries
+	- referenced from entities in repositories
+- Criteria API
+- Helpers
+	- JdbcTemplate
+	- NamedParameterJdbcTemplate
+	- Sort.by
+	- PageRequest.of
+Auditing
+	- @CreatedDate
+	- @CreatedBy
+	- @LastModifiedDate
+	- @LastModifiedBy
 
 ## Spring querydsl
 
@@ -37,3 +66,19 @@ docker run -d -p 3306:3306 --name mysql-docker-container -e MYSQL_ROOT_PASSWORD=
 ## Additional resources
 
 - [Spring Data JPA](https://github.com/matebence/jpa)
+
+## Spring REST
+
+Two options:
+- **@Controller**
+	- @ResponseBody
+	- @RequestMapping(value = "/get/{id}", method = RequestMethod.GET, produces = MediaType.APPLICATION_JSON_VALUE)
+- **@RestController**
+	- @GetMapping(value = "/{id}")
+
+Additional performance improvement with HAZELCAST (caching)
+- @Cacheable(value = "account-cache", key = "#id")
+- @CacheEvict(value = "account-cache", key = "#id")
+
+API docs via
+- springdoc-openapi

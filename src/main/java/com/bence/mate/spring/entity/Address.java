@@ -3,13 +3,13 @@ package com.bence.mate.spring.entity;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.Column;
 
+import java.io.Serializable;
+
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.io.Serializable;
 
 @Builder
 @Embeddable

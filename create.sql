@@ -13,6 +13,27 @@ create table budget (
     primary key (id)
 ) engine=InnoDB;
 
+create table contact_msg (
+   contact_id integer not null,
+    created_at datetime(6),
+    created_by varchar(255),
+    update_at datetime(6),
+    updated_by varchar(255),
+    email varchar(255),
+    message varchar(255),
+    mobile_num varchar(255),
+    name varchar(255),
+    status varchar(255),
+    subject varchar(255),
+    primary key (contact_id)
+) engine=InnoDB;
+
+create table contact_msg_seq (
+   next_val bigint
+) engine=InnoDB;
+
+insert into contact_msg_seq values ( 1 );
+
 create table credential (
    id bigint not null,
     password varchar(255),

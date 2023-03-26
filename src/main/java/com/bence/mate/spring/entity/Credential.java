@@ -1,7 +1,8 @@
 package com.bence.mate.spring.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.springframework.hateoas.RepresentationModel;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.GeneratedValue;
@@ -14,20 +15,20 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import jakarta.persistence.Id;
 
+import java.io.Serializable;
+
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.io.Serializable;
-
 @Entity
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "CREDENTIAL")
-@JsonIgnoreProperties(value = {"_links"})
+@JsonIgnoreProperties(value = { "_links" })
 public class Credential extends RepresentationModel<Credential> implements Serializable {
 
 	public Credential(Credential credential) {

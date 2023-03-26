@@ -4,8 +4,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Bean;
 
 import com.hazelcast.config.IntegrityCheckerConfig;
-import com.hazelcast.config.Config;
 import com.hazelcast.config.MapConfig;
+import com.hazelcast.config.Config;
 
 @Configuration
 public class BudgetCachingConfig {

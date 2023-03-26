@@ -14,6 +14,10 @@ drop table if exists account;
 
 drop table if exists budget;
 
+drop table if exists contact_msg;
+
+drop table if exists contact_msg_seq;
+
 drop table if exists credential;
 
 drop table if exists credential_seq;

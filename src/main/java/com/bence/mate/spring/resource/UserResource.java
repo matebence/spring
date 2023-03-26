@@ -20,6 +20,7 @@ import com.bence.mate.spring.entity.User;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;

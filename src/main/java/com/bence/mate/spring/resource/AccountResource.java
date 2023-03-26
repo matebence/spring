@@ -28,6 +28,7 @@ import com.bence.mate.spring.entity.Account;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.Hidden;
+
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.stream.Collectors;
