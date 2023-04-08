@@ -81,3 +81,92 @@ class AnimalConfigUnitTest {
     // same test validating that all beans are available in the context
 }
 ```
+
+## Logging
+
+Frameworks:
+- **Java Util**
+- **Log4J2**
+- **SLF4J**
+- **Logback**
+
+Useally we have the following types of logging:
+- **FATAL** - crucial error, and application stops
+- **ERROR** - crucial error, and application stops
+- **WARN** - error but the application will run
+- **INFO** - any information we want to print to the console
+- **DEBUG** - web application is in debug mode
+- **TRACE** - for every minor logs
+
+
+The way logging works is, if we enable **TRACE** then all above severities like **DEBUG** **INFO** **WARN** and **ERROR** are also printed.
+Suppose if we enable **ERROR** logging only, then all lower severities like **WARN** **INFO** **DEBUG** **TRACE** will not be logged.
+
+
+**APPLICATION LOGS**
+
+```properties
+debug=true
+```
+
+**MORE LOG DETAILS**
+
+```properties
+trace=true
+```
+
+**SHOWING LOGS**
+
+```properties
+logging.level.root=INFO 							
+logging.level.com.ioc.* = ERROR 				
+logging.level.com.ioc.controller = ERROR
+logging.level.com.ioc.aspect = TRACE 			
+```
+
+**GROUPING**
+
+```properties
+logging.group.eazy_school_error=com.ioc.aspects, com.ioc.controller
+logging.level.eazy_school_error=ERROR
+```
+
+**COLORING**
+
+```properties
+spring.output.ansi.enabled=ALWAYS
+```
+
+
+## Actuator & Spring Boot Admin
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+```
+
+```properties
+management.endpoints.web.base-path=/ioc/actuator
+management.endpoints.web.exposure.include=*
+```
+
+```xml
+<dependency>
+	<groupId>de.codecentric</groupId>
+	<artifactId>spring-boot-admin-starter-client</artifactId>
+</dependency>
+```
+
+```java
+@EnableAdminServer
+@SpringBootApplication
+public class Application {
+
+	public static void main(String[] args) {
+		SpringApplication.run(Application.class, args);
+	}
+
+}
+```
