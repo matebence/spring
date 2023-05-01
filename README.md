@@ -1,11 +1,57 @@
 ## Unit tests with plain JUnit & Mockito
 
+### Setting up MySQL Container
+
+```bash
+docker run -d -p 3306:3306 --name mysql-docker-container -e MYSQL_ROOT_PASSWORD=spring -e MYSQL_DATABASE=spring -e MYSQL_USER=spring -e MYSQL_PASSWORD=spring mysql/mysql-server:latest
+```
+
+```bash
+docker run -d -p 3306:3306 --name mysql-docker-test-container -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=test -e MYSQL_USER=test -e MYSQL_PASSWORD=test mysql/mysql-server:latest
+```
+
 ### Annotations explained
+
+**Without Spring**
 
 - JUnit < 5
     - **@RunWith(MockitoJRunner.class)**
 - JUnit >= 5
     - **@ExtendWith(MockitoExtension.class)**
+
+**With Spring**
+
+- JUnit < 5
+    - **@RunWith(SpringRunner.class)**
+- JUnit >= 5
+    - **@ExtendWith(SpringExtension.class)**
+
+```java
+public class MockitoExtension
+extends java.lang.Object
+implements BeforeEachCallback, AfterEachCallback, ParameterResolver{..}
+```
+
+```java
+public class SpringExtension
+extends Object
+implements BeforeAllCallback, AfterAllCallback, TestInstancePostProcessor, BeforeEachCallback, AfterEachCallback, BeforeTestExecutionCallback, AfterTestExecutionCallback, ParameterResolver{..}
+```
+
+- Service test
+	- **@SpringBootTest(webEnvironment = WebEnvironment.NONE)** - annotation loads the full application context so that we can able to test various components
+- Controller test (integration)
+	- **@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)**
+- Controller test (unit)
+	- **@SpringBootTest(webEnvironment = WebEnvironment.MOCK)**
+	- **@WebMvcTest** - annotation loads only the specified controller and its dependencies only without loading the entire application
+	- **@JsonTest** - for testing the JSON marshalling and unmarshalling
+	- **@RestClientTests** - for testing REST clients
+- Repository test
+	- **@DataJpaTest** - for testing the repository layer
+- **@ActiveProfiles("test")** - activates specific profile
+- **@ContextConfiguration/@Import** - test a Component, such as a third party library wrapper or load some specific beans
+- **@TestPropertySource** - with this annotation, we can define configuration sources that have higher precedence than any other source used in the project
 
 ### Default values explained
 
@@ -23,7 +69,19 @@
 
 ### Additional capabilities provided by Spring
 
+
+
 ### Depencies with Spring
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-test</artifactId>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+```
 
 ### Depencies without Spring
 
@@ -46,6 +104,12 @@
         <artifactId>mockito-core</artifactId>
         <version>5.3.1</version>
         <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-suite-engine</artifactId>
+      <version>1.9.3</version>
+      <scope>test</scope>
     </dependency>
 </dependencies>
 ```
@@ -355,7 +419,7 @@ class SortTestWIthMockitoAnnotations {
     private Table table;
 
     @Test
-    @EnabledForJreRange(min= JRE.JAVA_8)
+    @EnabledForJreRange(min= JRE.JAVA_11)
     public void whenMergeSortIsCalled_thenStubShouldBeUsed() {
         // given
         when(mergeStub.start(new int[]{5, 4, 3, 2, 1})).thenReturn(new int[]{1, 2, 3, 4, 5});
@@ -411,6 +475,7 @@ public class TableTest {
 
     @Test
     @Order(2)
+    @RepeatedTest(10)
     public void whenMergeSortIsCalled_thenRealMethodShouldBeUsed() {
         // given
         doCallRealMethod().when(table).addNumbers(any());
@@ -421,5 +486,12 @@ public class TableTest {
         // then
         verify(table, times(1)).addNumbers(new int[]{5, 4, 3, 2, 1});
     }
+}
+```
+
+```java
+@Suite
+@SelectClasses({SortTestWIthMockito.class, SortTestWIthMockitoAnnotations.class})
+public class IntegrationTest {
 }
 ```
