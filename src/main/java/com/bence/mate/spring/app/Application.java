@@ -22,7 +22,6 @@ import io.swagger.v3.oas.annotations.OpenAPIDefinition;
 import io.swagger.v3.oas.annotations.info.Info;
 
 import com.bence.mate.spring.rest.TodoEndpoint;
-import com.bence.mate.spring.entity.Contact;
 import com.bence.mate.spring.rest.data.Task;
 import com.bence.mate.spring.rest.data.Todo;
 
@@ -66,7 +65,7 @@ public class Application implements CommandLineRunner {
 		log.info("---------------RESTTEMPLATE---------------");
 		HttpHeaders headers = new HttpHeaders();
 		headers.add("invocationFrom", "RestTemplate");
-		HttpEntity<Contact> httpEntity = new HttpEntity<>(headers);
+		HttpEntity<HttpHeaders> httpEntity = new HttpEntity<>(headers);
 		ResponseEntity<Todo> responseEntity = restTemplate.exchange(TODO_URL, HttpMethod.GET, httpEntity, Todo.class);
 
 		todo = responseEntity.getBody();
