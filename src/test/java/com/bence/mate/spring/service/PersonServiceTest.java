@@ -12,6 +12,8 @@ import com.bence.mate.spring.entity.Person;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(webEnvironment = WebEnvironment.NONE)
@@ -36,5 +38,6 @@ public class PersonServiceTest {
 		// then
 		assertNull(instance.getId());
 		assertEquals(person.getId(), persisted.getId());
+		verify(personRepository, times(1)).save(any());		
 	}
 }

@@ -24,7 +24,7 @@ public class DatastoreSystemsHealthTest {
 			String catalogName = dataSource.getConnection().getCatalog();
 
 			// then
-			assertEquals(catalogName, "spring");
+			assertEquals(catalogName, "test");
 		} catch (SQLException e) {
 			e.printStackTrace();
 		}

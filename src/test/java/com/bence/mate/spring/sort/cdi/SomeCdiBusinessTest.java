@@ -11,6 +11,8 @@ import org.mockito.Mock;
 import com.bence.mate.spring.Application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 @ContextConfiguration(classes = Application.class)
@@ -30,6 +32,7 @@ public class SomeCdiBusinessTest {
 
 		// then
 		assertEquals(4, business.findGreatest());
+		verify(daoMock, times(1)).getData();
 	}
 
 	@Test
@@ -40,6 +43,7 @@ public class SomeCdiBusinessTest {
 
 		// then
 		assertEquals(Integer.MIN_VALUE, business.findGreatest());
+		verify(daoMock, times(1)).getData();
 	}
 
 	@Test
@@ -50,5 +54,6 @@ public class SomeCdiBusinessTest {
 
 		// then
 		assertEquals(2, business.findGreatest());
+		verify(daoMock, times(1)).getData();
 	}
 }

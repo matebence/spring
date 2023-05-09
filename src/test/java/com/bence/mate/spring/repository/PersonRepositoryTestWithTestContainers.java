@@ -1,15 +1,25 @@
 package com.bence.mate.spring.repository;
 
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase.Replace;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.junit.jupiter.api.function.Executable;
 import org.springframework.test.context.jdbc.Sql;
+
+import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.bence.mate.spring.AbstractContainerBaseTest;
 import com.bence.mate.spring.entity.Person;
 
 import java.util.NoSuchElementException;
 import java.util.Optional;
+
+import java.sql.SQLException;
+import javax.sql.DataSource;
+
+import lombok.extern.slf4j.Slf4j;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,12 +27,26 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertAll;
 
-// It uses by default the H2 in memory database, because of that we have add h2 dependency in our pom.xml
+@Slf4j
 @DataJpaTest
-public class PersonRepositoryTest {
+@AutoConfigureTestDatabase(replace = Replace.NONE)
+public class PersonRepositoryTestWithTestContainers extends AbstractContainerBaseTest {
 
 	@Autowired
 	private PersonRepository personRepository;
+
+	@Autowired
+	private DataSource dataSource;
+
+	@BeforeEach
+	void setup() throws SQLException {
+		log.info(MY_SQL_CONTAINER.getUsername());
+		log.info(MY_SQL_CONTAINER.getPassword());
+		log.info(MY_SQL_CONTAINER.getDatabaseName());
+		log.info(MY_SQL_CONTAINER.getJdbcUrl());
+
+		log.info(dataSource.getConnection().getMetaData().getURL().toString());
+	}
 
 	@Test
 	public void whenPersonIsSaved_thenItShouldBePersisted() {

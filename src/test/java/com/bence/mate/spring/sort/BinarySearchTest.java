@@ -13,7 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 // @SpringBootTest is meta annotated with @ExtendWith(SpringExtension.class) and which means every time your tests are extended with SpringExtension
 @ExtendWith(SpringExtension.class)
 // only needed when main class is not in default location
-@ContextConfiguration(classes = Application.class) 
+// @ContextConfiguration(classes = {Application.class}) with this the whole application config would be loaded
+@ContextConfiguration(classes = {BinarySearchImpl.class, BubbleSortAlgorithm.class, QuickSortAlgorithm.class}) 
 // when we use XML based configuration
 // @ContextConfiguration(locations = "/applicationContext.xml") 
 public class BinarySearchTest {

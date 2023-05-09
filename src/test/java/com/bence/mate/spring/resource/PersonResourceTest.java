@@ -6,23 +6,31 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.http.MediaType;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.Captor;
+
+import java.util.Optional;
 
 import com.bence.mate.spring.service.PersonService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.bence.mate.spring.entity.Person;
 
-import java.util.Optional;
-
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 @WebMvcTest(PersonResource.class)
@@ -39,6 +47,9 @@ public class PersonResourceTest {
 
 	@InjectMocks
 	private PersonResource personResource;
+	
+	@Captor
+	private ArgumentCaptor<Long> expectedId;
 
 	@Test
 	public void whenPersonIsSaved_thenStatusCreatedIsExpected() throws Exception {
@@ -73,6 +84,10 @@ public class PersonResourceTest {
 				.andExpect(jsonPath("$.lastName").value(person.getLastName()))
 				.andExpect(jsonPath("$.firstName").value(person.getFirstName()))
 				.andDo(print());
+		
+		// for primitives use anyDouble(), anyBoolean()
+		// use eq() to mix matchers and concrete values method(any(), eq(400.0))
+		verify(personService, times(1)).find(anyLong());
 
 	}
 
@@ -94,7 +109,7 @@ public class PersonResourceTest {
 				.andExpect(jsonPath("$.lastName").value(instance.getLastName()))
 				.andExpect(jsonPath("$.firstName").value(instance.getFirstName()))
 				.andDo(print());
-
+		verify(personService, times(1)).update(any(), eq(1L));
 	}
 
 	@Test
@@ -109,6 +124,8 @@ public class PersonResourceTest {
 		mockMvc.perform(delete("/persons/{id}", id).contentType(MediaType.APPLICATION_JSON))
 				.andExpect(status().isNoContent())
 				.andDo(print());
-
+		
+		verify(personService, times(1)).delete(expectedId.capture());
+		assertEquals(id, expectedId.getValue());
 	}
 }
