@@ -42,7 +42,7 @@ public class PersonResourceTest {
 	@Autowired
 	private ObjectMapper objectMapper;
 
-	@MockBean
+	@MockBean // it injeckts the PersonService into PersonResource, otherwise NoSuchBeanException
 	private PersonService personService;
 
 	@InjectMocks
