@@ -8,8 +8,8 @@ A thread is a separate flow of execution. A thread is capable of performing the 
 
 **Time slicing algorithm** -  Processing time for a single core is shared among proecsses and threads. This is called time-slicing
 
-_____ 		_____ 		_____ 			thread #1
-    _____ 	 _____  	  _____         thread #2
+    _____ 		_____ 		_____ 			thread #1
+        _____ 	 _____  	  _____         thread #2
 
 
 |Process based                                                                                                                                     |Thread based                                                                  |
@@ -22,7 +22,7 @@ _____ 		_____ 		_____ 			thread #1
 |-                                                                                                                                                 |Threads are independent of other threds                                       |
 |-                                                                                                                                                 |Exmaple: a thread can access a databse while other threads is sorting an array|
 
-![Threads VS Processes in OS](https://raw.githubusercontent.com/matebence/spring/parallel/threads_vs_process_in_os.webp)
+![Threads VS Processes in OS](https://raw.githubusercontent.com/matebence/spring/parallel/docs/threads_vs_process_in_os.webp)
 
 Memory management
 - **Stack memory** - the local variables and method arguments as well as method call are stored on the stack
@@ -40,7 +40,7 @@ But if those tasks are dependent on other tasks, Meaning if a task should wait f
 
 ### Thread life cycle
 
-![Thread life cycle](https://raw.githubusercontent.com/matebence/spring/parallel/thread_lifecycle.webp)
+![Thread life cycle](https://raw.githubusercontent.com/matebence/spring/parallel/docs/thread_lifecycle.webp)
 
 - **New state** - Before calling the start() method on the newly created thread instance, the thread is in a “new state”.
 - *Runnable state** - The thread is in a “runnable state” after calling the start() method, but it has not been selected as the running thread by the thread scheduler.
