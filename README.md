@@ -8,8 +8,8 @@ A thread is a separate flow of execution. A thread is capable of performing the 
 
 **Time slicing algorithm** -  Processing time for a single core is shared among proecsses and threads. This is called time-slicing
 
-    _____ 		_____ 		_____ 			thread #1
-        _____ 	 _____  	  _____         thread #2
+		_____			_____			_____			thread #1
+	_____		_____			_____					thread #2
 
 
 |Process based                                                                                                                                     |Thread based                                                                  |
