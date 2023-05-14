@@ -80,6 +80,7 @@ The main thread’s priority is set to 5 by default. When we create new threads,
 
 - extend **Thread** class
 - implement **Runnable** interface
+- implement **Callable** interface (it has a return value)
 
 ```java
 public class HeavyTask extends Thread {
@@ -109,6 +110,15 @@ public class ComplexTask implements  Runnable {
     }
 }
 
+public class LongTask implements Callable<Integer> {
+
+    @Override
+    public Integer call() throws Exception {
+        Thread.sleep(2000);
+        return new Integer(21);
+    }
+}
+
 public class App {
 
     public static void main(String args[]) throws InterruptedException {
@@ -122,6 +132,12 @@ public class App {
         System.out.println("Executing HeavyTask");
         second.start();
         second.wait();
+
+        ExecutorService executorService = Executors.newFixedThreadPool(2);
+        Callable<Integer> callable = new LongTask();
+        Future<Integer> integerFuture =  executorService.submit(callable);
+        integerFuture.get(2, TimeUnit.SECONDS);
+        executorService.shutdown();
     }
 }
 ```
@@ -496,5 +512,648 @@ public class LiveLock {
 }
 ```
 
-### Concurrent variables, objects and methods 
+### Atomic Variables
 
+```java
+public class Counter {
+    int counter; 
+ 
+    public void increment() {
+        counter++;
+    }
+}
+```
+
+In the case of a single-threaded environment, this works perfectly; however, as soon as we allow more than one thread to write, we start getting inconsistent results.
+
+This is because of the simple increment operation (counter++), which may look like an atomic operation, but in fact is a combination of three operations: obtaining the value, incrementing, and writing the updated value back.
+
+**Atomic Operations**
+
+There is a branch of research focused on creating non-blocking algorithms for concurrent environments. These algorithms exploit low-level atomic machine instructions such as compare-and-swap (CAS), to ensure data integrity.
+
+A typical CAS operation works on three operands:
+- The memory location on which to operate (M)
+- The existing expected value (A) of the variable
+- The new value (B) which needs to be set
+
+The CAS operation updates atomically the value in M to B, but only if the existing value in M matches A, otherwise no action is taken.
+In both cases, the existing value in M is returned. This combines three steps – getting the value, comparing the value, and updating the value – into a single machine level operation.
+
+
+The most commonly used atomic variable classes in Java are AtomicInteger, AtomicLong, AtomicBoolean, and AtomicReference. These classes represent an int, long, boolean, and object reference respectively which can be atomically updated. The main methods exposed by these classes are:
+- get() – gets the value from the memory, so that changes made by other threads are visible; equivalent to reading a volatile variable
+- incrementAndGet() – Atomically increments by one the current value
+- set() – writes the value to memory, so that the change is visible to other threads; equivalent to writing a volatile variable
+- lazySet() – eventually writes the value to memory, maybe reordered with subsequent relevant memory operations. One use case is nullifying references, for the sake of garbage collection, which is never going to be accessed again. In this case, better performance is achieved by delaying the null volatile write
+- compareAndSet() – same as described in section 3, returns true when it succeeds, else false
+- weakCompareAndSet() – same as described in section 3, but weaker in the sense, that it does not create happens-before orderings. This means that it may not necessarily see updates made to other variables. As of Java 9, this method has been deprecated in all atomic implementations in favor of weakCompareAndSetPlain(). The memory effects of weakCompareAndSet() were plain but its names implied volatile memory effects. To avoid this confusion, they deprecated this method and added four methods with different memory effects such as weakCompareAndSetPlain() or weakCompareAndSetVolatile()
+
+```java
+public class SafeCounterWithoutLock {
+    private final AtomicInteger counter = new AtomicInteger(0);
+    
+    int getValue() {
+        return counter.get();
+    }
+    
+    void increment() {
+        counter.incrementAndGet();
+    }
+}
+```
+
+### Creating Threads with executors
+
+Wit the increase in the number of cores avaible in the processor nowadays multithreading is getting more and more crucial. Java provides its own multi threading framework the so called Executor Framework. Why to use it ?? Creating and managing threads is expensive.
+
+    Threads pools can reuse threads in an extremely efficent manner by keeping the threads alive and reusing them
+
+- SingleThreadExecutor - This executor has a single thread so we can execute processes in a sequential manner. Every process is executed by a new thread
+- ScheduledExecutor - We can execute a given operation at regular intervals or we can use this executor if we wish to delay a certain task
+- FixedThreadPool(n) - This is how we can create a thread pool with n threads. Useally n is the number of cores in the CPU
+- CachedThreaddPool - The number of threads is not bounded. If all the threads are busy executing some tasks and a new task comes the pool will create and add a new thread to the executor
+
+```java
+public class App {
+
+    public static void main(String args[]) {
+        List<Integer> list = new ArrayList<>();
+        final Object lock = new Object();
+
+        Consumer consumer = new Consumer(list, lock);
+        Producer producer = new Producer(list, lock);
+
+        consumer.setProducer(producer);
+        producer.setConsumer(consumer);
+
+         Executor executor = Executors.newFixedThreadPool(2);
+        // Executor executor = Executors.newScheduledThreadPool(2);
+        // Executor executor = Executors.newSingleThreadExecutor();
+        // Executor executor = Executors.newCachedThreadPool();
+
+        executor.execute(producer);
+        executor.execute(consumer);
+
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(1000, TimeUnit.MILLISECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterrruptedException e) {
+            executor.shutdownNow();
+        }
+        
+        // new Thread(producer).start();
+        // new Thread(consumer).start();
+    }
+}
+```
+
+### Concurrent collection
+
+- **CountDown latch** - a single thread can wait for other threads to fnish with their operations. They have to be independent tasks.
+
+```java
+public class ComplexTask implements Runnable {
+
+    private final CountDownLatch countDownLatch;
+
+    public ComplexTask(CountDownLatch countDownLatch) {
+        this.countDownLatch = countDownLatch;
+    }
+
+    @Override
+    public void run() {
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println("Counting down");
+        countDownLatch.countDown();
+    }
+}
+
+public class LongTask implements Runnable {
+
+    private final CountDownLatch countDownLatch;
+
+    public LongTask(CountDownLatch countDownLatch) {
+        this.countDownLatch = countDownLatch;
+    }
+
+    @Override
+    public void run() {
+        try {
+            Thread.sleep(4000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println("Counting down");
+        countDownLatch.countDown();
+    }
+}
+
+public class App {
+
+    public static void main(String args[]) throws InterruptedException {
+        CountDownLatch countDownLatch = new CountDownLatch(2);
+
+        Runnable complextTask = new ComplexTask(countDownLatch);
+        Runnable longTask = new LongTask(countDownLatch);
+
+        ExecutorService executorService = Executors.newCachedThreadPool();
+        executorService.execute(complextTask);
+        executorService.execute(longTask);
+
+		// if the latch is not 0 we will wait here
+        countDownLatch.await();
+        System.out.println("DONE");
+    }
+}
+```
+
+- **CyclicBarrier** - multiple threads can wait for each other
+
+```java
+public class LongTask implements Runnable {
+
+    private final CyclicBarrier cyclicBarrier;
+
+    public LongTask(CyclicBarrier cyclicBarrier) {
+        this.cyclicBarrier = cyclicBarrier;
+    }
+
+    @Override
+    public void run() {
+        try {
+            Thread.sleep(2000);
+            System.out.println("Long task is done");
+            cyclicBarrier.await();
+        } catch (BrokenBarrierException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+public class ComplexTask implements Runnable {
+
+    private final CyclicBarrier cyclicBarrier;
+
+    public ComplexTask(CyclicBarrier cyclicBarrier) {
+        this.cyclicBarrier = cyclicBarrier;
+    }
+
+    @Override
+    public void run() {
+        try {
+            Thread.sleep(6000);
+            System.out.println("ComplexTask is done");
+            cyclicBarrier.await();
+        } catch (InterruptedException | BrokenBarrierException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+public class App {
+
+    public static void main(String args[]) {
+        final Integer NUMBER_OF_THREADS = 2;
+
+        ExecutorService executorService = Executors.newFixedThreadPool(NUMBER_OF_THREADS);
+        CyclicBarrier cyclicBarrier = new CyclicBarrier(NUMBER_OF_THREADS, () -> {
+            System.out.println("Everything is done");
+        });
+
+        Runnable complexTask = new ComplexTask(cyclicBarrier);
+        Runnable longTask = new LongTask(cyclicBarrier);
+
+        executorService.execute(complexTask);
+        executorService.execute(longTask);
+        executorService.shutdown();
+    }
+}
+```
+
+- **BlokingQuueue** - we wait until at least one is removed when we have full capacity
+
+```java
+public class FirstWorker implements Runnable {
+
+    private final BlockingQueue<Integer> queueu;
+
+    public FirstWorker(BlockingQueue<Integer> queueu) {
+        this.queueu = queueu;
+    }
+
+    @Override
+    public void run() {
+        int counter = 0;
+        while(true) {
+            try {
+                queueu.put(counter);
+                counter++;
+                Thread.sleep(6000);
+                System.out.println("Putting " + counter);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+public class SecondWorker implements Runnable {
+
+    private final BlockingQueue<Integer> queueu;
+
+    public SecondWorker(BlockingQueue<Integer> queueu) {
+        this.queueu = queueu;
+    }
+
+    @Override
+    public void run() {
+        int counter = 0;
+        while(true) {
+            try {
+                counter = queueu.take();
+                Thread.sleep(3000);
+                System.out.println("Taking " + counter);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+public class App {
+
+    public static void main(String args[]) {
+        //we wait until at least one is removed when we have full capacity 10/10
+        BlockingQueue<Integer> queue = new ArrayBlockingQueue<>(10);
+        FirstWorker firstWorker = new FirstWorker(queue);
+        SecondWorker secondWorker = new SecondWorker(queue);
+
+        new Thread(firstWorker).start();
+        new Thread(secondWorker).start();
+    }
+}
+```
+
+**DelayQueue** - keeps the element internally until a certain delay has expired
+
+```java
+public class DelayWorker implements Delayed {
+
+    private final String message;
+    private final long duration;
+
+    public DelayWorker(String message, long duration) {
+        this.message = message;
+        this.duration = System.currentTimeMillis() + duration;
+    }
+
+    @Override
+    public long getDelay(TimeUnit unit) {
+        long diff = duration - System.currentTimeMillis();
+        return unit.convert(diff, TimeUnit.MILLISECONDS);
+    }
+
+    @Override
+    public int compareTo(Delayed obj) {
+        return Long.compare(this.duration, ((DelayWorker) obj).getDuration());
+    }
+
+    public long getDuration() {
+        return duration;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+}
+
+public class App {
+
+    public static void main(String args[]) throws InterruptedException {
+        BlockingQueue<DelayWorker> queue = new DelayQueue<>();
+
+        try {
+            queue.put(new DelayWorker("This is the first message ...", 2000));
+            queue.put(new DelayWorker("This is the second message ...", 10000));
+            queue.put(new DelayWorker("This is the third message ...", 4500));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        while(!queue.isEmpty()) {
+            System.out.println(queue.take().getMessage());
+        }
+    }
+}
+```
+
+**PriorityBlockingQueue** - it uses the same ordering rules as the PriorityQueue class and we have to implement the Comparable interface
+
+```java
+public class Person implements Comparable<Person> {
+
+    private int age;
+    private String name;
+
+    public Person() {
+    }
+
+    public Person(int age, String name) {
+        this.age = age;
+        this.name = name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public void setAge(int age) {
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    @Override
+    public int compareTo(Person o) {
+        return name.compareTo(o.getName());
+    }
+
+    @Override
+    public String toString() {
+        return "Person{" +
+                "age=" + age +
+                ", name='" + name + '\'' +
+                '}';
+    }
+}
+
+public class FirstWorker implements Runnable {
+
+    private PriorityBlockingQueue<Person> queue;
+
+    public FirstWorker(PriorityBlockingQueue<Person> queue) {
+        this.queue = queue;
+    }
+
+    @Override
+    public void run() {
+        try {
+            Thread.sleep(5000);
+            System.out.println(queue.take());
+            System.out.println(queue.take());
+            Thread.sleep(1000);
+            System.out.println(queue.take());
+            Thread.sleep(2000);
+            System.out.println(queue.take());
+            System.out.println(queue.take());
+            System.out.println(queue.take());
+            System.out.println(queue.take());
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+public class SecondWorker implements Runnable {
+
+    private final PriorityBlockingQueue<Person> queue;
+
+    public SecondWorker(PriorityBlockingQueue<Person> queue) {
+        this.queue = queue;
+    }
+
+    @Override
+    public void run() {
+        try {
+            queue.put(new Person(5, "E"));
+            queue.put(new Person(4, "D"));
+            queue.put(new Person(3, "C"));
+            Thread.sleep(2000);
+            queue.put(new Person(2, "B"));
+            Thread.sleep(1000);
+            queue.put(new Person(1, "A"));
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+public class App {
+
+    public static void main(String args[]) {
+        PriorityBlockingQueue<Person> queue = new PriorityBlockingQueue<>();
+
+        FirstWorker first = new FirstWorker(queue);
+        SecondWorker second = new SecondWorker(queue);
+
+        new Thread(first).start();
+        new Thread(second).start();
+    }
+}
+```
+
+- **Concurrent map** - (if we use the map only for reading, this is not needed)
+
+```java
+public class FirstWorker implements Runnable {
+
+    private final ConcurrentMap<String, Integer> map;
+
+    public FirstWorker(ConcurrentMap<String, Integer> map) {
+        this.map = map;
+    }
+
+    @Override
+    public void run() {
+        try {
+            map.put("B", 12);
+            Thread.sleep(1000);
+            map.put("Z", 5);
+            map.put("A", 25);
+            Thread.sleep(2000);
+            map.put("D", 25);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+public class SecondWorker implements Runnable {
+
+    private ConcurrentMap<String, Integer> map;
+
+    public SecondWorker(ConcurrentMap<String, Integer> map) {
+        this.map = map;
+    }
+
+    @Override
+    public void run() {
+        try {
+            Thread.sleep(5000);
+            System.out.println(map.get("A"));
+            Thread.sleep(2000);
+            System.out.println(map.get("Z"));
+            System.out.println(map.get("B"));
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+public class App {
+
+    public static void main(String args[]) {
+        ConcurrentMap<String, Integer> map = new ConcurrentHashMap<>();
+
+        Runnable first = new FirstWorker(map);
+        Runnable second = new SecondWorker(map);
+
+        new Thread(first).start();
+        new Thread(second).start();
+    }
+}
+```
+
+- **CopyOnWriteArray** - thread that change the value in the list make copy of the list. This is how update will be atomic - threads must wait for each other to update the list. (if we use the array only for reading, this is not needed)
+
+```java
+public class WriteTask implements Runnable {
+
+    private final List<Integer> list;
+    private final Random random;
+
+    public WriteTask(List<Integer> list) {
+        this.list = list;
+        this.random = new Random();
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            list.set(random.nextInt(list.size()), random.nextInt(10));
+        }
+    }
+}
+
+public class ReadTask implements Runnable {
+
+    private final List<Integer> list;
+
+    public ReadTask(List<Integer> list) {
+        this.list = list;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            System.out.println(list.get(list.size() - 1));
+        }
+    }
+}
+
+public class App {
+
+    public static void main(String args[]) {
+        List<Integer> list = new CopyOnWriteArrayList<>(Arrays.asList(0, 0, 0, 0, 0, 0, 0, 0, 0, 0));
+
+        Thread t1 = new Thread(new WriteTask(list));
+        Thread t2 = new Thread(new WriteTask(list));
+        Thread t3 = new Thread(new WriteTask(list));
+        Thread t4 = new Thread(new ReadTask(list));
+
+        t1.start();
+        t2.start();
+        t3.start();
+        t4.start();
+    }
+}
+```
+
+- **Exchanger** - sharing information between threads
+
+```java
+public class FirstWorker implements Runnable {
+
+    private int counter;
+    private final Exchanger<Integer> exchanger;
+
+    public FirstWorker(Exchanger<Integer> exchanger) {
+        this.counter = 0;
+        this.exchanger = exchanger;
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                counter--;
+                counter = exchanger.exchange(counter);
+                System.out.println(counter);
+                Thread.sleep(1000);
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+public class SecondWorker implements Runnable {
+
+    private int counter;
+    private final Exchanger<Integer> exchanger;
+
+    public SecondWorker(Exchanger<Integer> exchanger) {
+        this.counter = 0;
+        this.exchanger = exchanger;
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (true) {
+                counter++;
+                counter = exchanger.exchange(counter);
+                System.out.println(counter);
+                Thread.sleep(1000);
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}
+
+public class App {
+
+    public static void main(String args[]) {
+        Exchanger<Integer> exchanger = new Exchanger<>();
+        Runnable firstWorker = new FirstWorker(exchanger);
+        Runnable secondWorker = new SecondWorker(exchanger);
+
+        new Thread(firstWorker).start();
+        new Thread(secondWorker).start();
+    }
+}
+```
