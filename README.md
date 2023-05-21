@@ -1,3 +1,24 @@
+## Concurrency and Parallelims API's in Java
+	
+- Java 1 (Single Core)
+    - Threads API
+- Java 5 (MultiCore)
+    - ThreadPool, ExecutorService, Futures, ConcurrentCollections etc...
+    - Deadlock issues
+- Java 7 (MultiCore)
+    - Data Parallelism
+    - Forj/Join Framework
+- Java 8 (MultiCore)
+    - Lambda Stream API
+    - Parallel Stream Completable Futures
+- Java 9(Flow Api)
+    - Publish Subscribe logic
+
+## Terminology
+
+- Concurrency is a concept where two or more task can run simultaneously
+- Parrallelism is a concept in which tasks are literally going to run in parrallel
+
 ## Thread
 
 A thread is a separate flow of execution. A thread is capable of performing the tasks that we have assigned to it independently. A Java program can have multiple threads to perform multi-tasking. Threads are independent, meaning When a Java program uses multi-threads, if an error occurs in one thread, it will not affect other threads. each thread will perform the tasks assigned to it simultaneously.
@@ -1157,3 +1178,313 @@ public class App {
     }
 }
 ```
+
+## Fork/Join Framework
+
+```java
+public class DataSet {
+    
+    public static List<String> namesList() {
+        return List.of("Bob", "Jamie", "Jill", "Rick");
+    }
+}
+
+public class ForkJoinUsingRecursion extends RecursiveTask<List<String>> {
+
+    private List<String> inputList;
+
+    public ForkJoinUsingRecursion(List<String> inputList) {
+        this.inputList = inputList;
+    }
+
+    /**
+     * Recursively split the list and runs each half as a ForkJoinTask
+     * Right way of using Fork/Join Task
+     */
+    @Override
+    protected List<String> compute() {
+
+        //trivial conditions
+        if (this.inputList.size() <= 1) {
+            List<String> resultList = new ArrayList<>();
+            inputList.forEach(name -> resultList.add(transform(name)));
+            return resultList;
+        }
+
+        int midPoint = inputList.size() / 2;
+        //left side of the list
+        ForkJoinTask<List<String>> leftInputList = new ForkJoinUsingRecursion(inputList.subList(0, midPoint)).fork(); // 1. asynchronously arranges this task in the deque,
+        inputList = inputList.subList(midPoint, inputList.size()); //right side of the list
+
+        //this is where recursion happens
+        List<String> rightResult = compute();
+        List<String> leftResult = leftInputList.join();
+
+        leftResult.addAll(rightResult);
+        return leftResult;
+    }
+    
+    private String transform(String name) {
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        return name.length() + " - " + name;
+    }
+}
+
+@Slf4j
+public class App {
+
+    private final static StopWatch stopWatch = new StopWatch("App");
+
+    public static void main(String[] args) {
+        ForkJoinPool forkJoinPool = new ForkJoinPool();
+        ForkJoinUsingRecursion forkJoinExampleUsingRecursion = new ForkJoinUsingRecursion(DataSet.namesList());
+        stopWatch.start();
+
+        // Start things running and get the result back, This is blocked until the results are calculated.
+        // invoke -> Add the task to the shared queue from which all the other qu
+        List<String> resultList = forkJoinPool.invoke(forkJoinExampleUsingRecursion);
+
+        log.info("resultList : " + resultList);
+        // 11:42:58.105 [main] INFO com.bence.mate.App -- resultList : [3 - Bob, 5 - Jamie, 4 - Jill, 4 - Rick]
+        // 11:42:58.118 [main] INFO com.bence.mate.App -- Total time taken : 540
+
+        stopWatch.stop();
+        log.info("Total time taken : " + stopWatch.getTime());
+    }
+}
+```
+
+## Parallel Streams
+
+Replacment of Fork/Join. Allows your code to run in parallel. ParallelStream are designed to solve Data Parallelism.
+
+- sequential() -> executes the stream in sequential
+- parallel() -> executes the stream in parallel
+
+Comparing Arraylist vs LinkedList ParallelStream performance
+- ArrayList - almost the same the sequantial and paralle processing of arrylist
+- LinkedList - parallel useage of here will slow down our program
+
+```java
+@Slf4j
+public class App {
+
+    private final static StopWatch stopWatch = new StopWatch("App");
+
+    private static String toUpperWithDelay(String value) {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        return value.toUpperCase();
+    }
+
+    public static void main(String[] args) {
+        List<String> input = List.of("Bob", "Jamie", "Jill", "Rick");
+
+        stopWatch.start();
+        List<String> outputSequential = input.stream().sequential().map(App::toUpperWithDelay).collect(Collectors.toList());
+        log.info("{}", outputSequential);
+        stopWatch.stop();
+        log.info("Total time taken : " + stopWatch.getTime());
+
+        stopWatch.reset();
+
+        stopWatch.start();
+        List<String> outputParallel = input.stream().parallel().map(App::toUpperWithDelay).collect(Collectors.toList());
+        log.info("{}", outputSequential);
+        stopWatch.stop();
+        log.info("Total time taken : " + stopWatch.getTime());
+    }
+}
+```
+
+## Completable Future
+
+- Is an async Reactive Functional Programming API
+
+Features:
+- Responsive
+    - Fundementally async
+    - Call returns immediately and the response wil be sent when its available
+- Elastic
+    - Async compputations normally run in pool of threads
+    - Number of thread can go up and down based on the need
+- Resilient
+    - Exception on error wont crash the app or code
+- Message Driven
+    - Async computations interact with each through message in a event driven style
+
+CompletableFuture API can be grouped into three categories:
+- Factory methods
+    - Initiate asynchrnous computation
+- Completation stage methods
+    - Chain asynchrnous computation
+- Exception methods
+    - Handle Exceptions in an Asynchrnous computation
+
+```java
+@Slf4j
+public class HelloWorldService {
+
+    public String helloWorld() {
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        log.info("inside helloWorld");
+        return "hello world";
+    }
+
+    public String hello() {
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        log.info("inside hello");
+        return "hello";
+    }
+
+    public String world() {
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        log.info("inside world");
+        return " world!";
+    }
+
+    public CompletableFuture<String> worldFuture(String input) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            return input + " world!";
+        });
+    }
+}
+
+@Slf4j
+public class App {
+
+    private final static StopWatch stopWatch = new StopWatch("App");
+
+    public static void main(String[] args) {
+        stopWatch.start();
+
+        HelloWorldService hws = new HelloWorldService();
+        CompletableFuture<String> hello = CompletableFuture.supplyAsync(hws::hello);
+        CompletableFuture<String> world = CompletableFuture.supplyAsync(hws::world);
+
+        CompletableFuture<CompletableFuture<String>> first = hello
+                .thenCombine(world, (h, w) -> h + w) // (first,second)
+                .thenApply(hws::worldFuture); //CompletableFuture inside CompletableFuture
+
+        log.info("result " + first.join());
+
+        CompletableFuture<String> second = hello
+                .thenCombine(world, (h, w) -> h + w) // (first,second)
+                .thenApply(String::toUpperCase)
+                .thenCompose(hws::worldFuture); // unwraps CompletableFuture like flatMap
+
+        second.thenAccept(s -> log.info("result " + s)).join();
+
+        stopWatch.stop();
+        log.info("Total time taken : " + stopWatch.getTime());
+    }
+}
+```
+
+Exception handling CompletableFuture
+- handle - catch exception and recover
+- exceptionally - catch exception and recover
+- whenComplete - catch exception and does not recover
+
+```java
+@Slf4j
+public class App {
+
+    private final static StopWatch stopWatch = new StopWatch("App");
+
+    public static void main(String[] args) {
+        stopWatch.start();
+
+        HelloWorldService hws = new HelloWorldService();
+        CompletableFuture<String> hello = CompletableFuture.supplyAsync(hws::hello);
+        CompletableFuture<String> world = CompletableFuture.supplyAsync(hws::world);
+
+        CompletableFuture<CompletableFuture<String>> first = hello
+                .whenComplete((s, throwable) -> {
+                    if (throwable != null) {
+                        log.info(throwable.getMessage());
+                    }
+                    log.info(s);
+                })
+                .thenCombine(world, (h, w) -> h + w)
+                .exceptionally(throwable -> {
+                    log.info(throwable.getMessage());
+                    return "alternative";
+                })
+                .thenApply(hws::worldFuture)
+                .handle((s, throwable) -> {
+                    if (throwable != null) {
+                        log.info(throwable.getMessage());
+                    }
+                    return CompletableFuture.supplyAsync(() -> "alternative");
+                });
+
+        log.info("result " + first.join().join());
+
+        stopWatch.stop();
+        log.info("Total time taken : " + stopWatch.getTime());
+    }
+}
+```
+
+The CompletableFuture behind the scnenes uses Fork/Join Pool, but we can apply our own Thread Pool, with the following risks:
+- Thread being locked by a time consuming task
+- Threads not avaiblable
+
+```java
+@Slf4j
+public class App {
+
+    private final static StopWatch stopWatch = new StopWatch("App");
+
+    public static void main(String[] args) {
+        ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        CompletableFuture<String> hello = CompletableFuture.supplyAsync(() -> this.hws.hello(), executorService);
+        CompletableFuture<String> world = CompletableFuture.supplyAsync(() -> this.hws.world(), executorService);
+    }
+}
+```
+
+|Regular functions  |Async overload Functions             |
+|-------------------|-------------------------------------|
+|thenCombine()      |thenCombineAsync()                   |
+|thenApply()        |thenApplyAsync()                     |
+|thenCompose()      |thenComposeAsync()                   |
+|thenAccept()       |thenAcceptAsync()                    |
+
+- Using async functions allows us to change the thread of execution
+- Use this when there are blocking operations in your CompletableFututre pipeline
+
+## Handling multiple completablefutures via anyOf() and allOf()
+
+- allOf()
+    - Static method that part of CompletableFuture API
+    - Use allOf() when you are dealing with Multiple CompletableFuture
+- anyOf()
+    - Static method that part of CompletableFuture API
+    - Use anyOf() when you are dealing with retrieving data from multiple Data Sources
+    - We will get back the data which returns faster (DB or SOAP or REST)
