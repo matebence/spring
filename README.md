@@ -1488,3 +1488,346 @@ public class App {
     - Static method that part of CompletableFuture API
     - Use anyOf() when you are dealing with retrieving data from multiple Data Sources
     - We will get back the data which returns faster (DB or SOAP or REST)
+
+## Reactive programming (Flux)
+
+Reactive types:
+- **Flux** - 0 to N elements
+- **Mono** - 0 to 1 elements
+
+Reactive Stream specification, it has four interfaces:
+- **Publisher** - one which provides data
+
+```java
+public interface Publisher<T> {
+    
+    public void subscribe(Subscriber<? super T> s)
+}
+```
+
+- **Subscriber** - one which recives data
+
+```java
+public interface SubScriber<T> {
+
+    public void onSubscribe(Subscription s);
+    public void onNext(T t);
+    public void onError(Throwable t);
+    public void onComplete();
+}
+```
+
+- **Subscription** - represent on-to-one relationship between publisher and subscriber
+
+```java
+public interface Subscription {
+    
+    public void request(long g);
+    public void cancel();
+}
+```
+
+- **Processor** - represent processing stage for Publisher and Subscriber
+
+```java
+public interface Processor<T, R> extends Subscriber<T>, Publisher<R> {
+}
+```
+
+Hot vs Cold streams:
+- **Cold** - streams is a type of stream which emits the elements from beginning to end for every new subscription
+    - HTTP call
+    - DB call
+- **Hot** - streams data is emitted continiously. Any new subscriber will only get the currenct state of the Reactive stream
+    - Uber driver tracking
+
+### just() defer() fromSupplier() fromCallable()
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    // Lazy vs Eager instation
+    
+    // Basically, this is the main difference between a Mono.just() 
+    // and the rest of the methods we’ll compare in this article.
+    // It is a hot publisher and the value has been captured at the instantiation time.
+    Mono<LocalDateTime> monoJust = Mono.just(getLocalDateTime()).log();
+    monoJust.subscribe(System.out::println);
+    monoJust.subscribe(System.out::println);
+    monoJust.subscribe(System.out::println);
+    
+    // This time, we’ve achieved a real laziness- a successfulDateFetching() 
+    // was triggered each time a new Subscriber was registered.
+    Mono<LocalDateTime> monoDefer = Mono.defer(() -> Mono.just(getLocalDateTime())).log();
+    monoDefer.subscribe(System.out::println);
+    monoDefer.subscribe(System.out::println);
+    monoDefer.subscribe(System.out::println);
+    
+    // Similarly to defer(), we can delay the data evaluation with Mono.fromSupplier() case
+    // If the Supplier resolves to null, the resulting Mono completes empty.
+    Mono<LocalDateTime> monoFromSupplier = Mono.fromSupplier(() -> getLocalDateTime()).log();
+    monoFromSupplier.subscribe(System.out::println);
+    monoFromSupplier.subscribe(System.out::println);
+    monoFromSupplier.subscribe(System.out::println);
+    
+    Mono<LocalDateTime> monoFromCallable = Mono.fromCallable(() -> getLocalDateTime()).log();
+    monoFromCallable.subscribe(System.out::println);
+    monoFromCallable.subscribe(System.out::println);
+    monoFromCallable.subscribe(System.out::println);
+}
+
+public LocalDateTime getLocalDateTime() {
+    try {
+        Thread.sleep(1000);	
+    } catch (InterruptedException ignored) {}
+    System.out.println("GETTING DATE");
+    return LocalDateTime.now();
+}
+```
+
+### From source
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    List<String> namesList = List.of("Taylor", "Steve");
+    Flux<String> fluxFromIterable = Flux.fromIterable(namesList);
+    fluxFromIterable.subscribe(System.out::println);
+
+    String[] namesArray = new String[] {"John", "Raj", "Peter"};
+    Flux<String> fluxFromArray = Flux.fromArray(namesArray);
+    fluxFromArray.subscribe(System.out::println);
+
+    Stream<String> namesStream = Stream.of("Brad", "Colin");
+    Flux<String> fluxFromStream = Flux.fromStream(namesStream);
+    fluxFromStream.subscribe(System.out::println);
+
+    Flux<Integer> fluxRange = Flux.range(1, 10);
+    fluxRange.subscribe(System.out::println);
+
+    // Similar to Optional
+    Mono.empty();
+    Mono.error(RuntimeException::new);
+}
+```
+
+### Data transformation
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    Flux<String> lettersFlux = Flux.just("A", "B", "C")
+            .filter(t -> t.equals("C"));
+    lettersFlux.subscribe(System.out::println, 
+            e -> System.out.println("This is a onError"), 
+            () -> System.out.println("This is onComplete"));
+
+    // Transform the items emitted by this Flux by applying a synchronous function to each item
+    Flux<Integer> numbersFluxMap = Flux.just("1", "2", "3")
+            .map(Integer::valueOf);
+    numbersFluxMap.subscribe(System.out::println, 
+            e -> System.out.println("This is a onError"), 
+            () -> System.out.println("This is onComplete"));
+
+    // ConcatMap works almost the same as flatMap, but preserves the order of items
+    Flux<Integer> numbersFluxConcatMap = Flux.just("1", "2", "3")
+            .concatMap(t -> Flux.just(Integer.valueOf(t.concat("1"))));
+    numbersFluxConcatMap.subscribe(System.out::println, 
+            e -> System.out.println("This is a onError"), 
+            () -> System.out.println("This is onComplete"));
+
+    // FlatMap does not care about the order of the items
+    // Transform the elements emitted by this Flux asynchronously into Publishers
+    List<String> keywordToSearch = List.of("b", "bo", "boo", "book", "books");
+    Flux<String> keywordFlatMap = Flux.fromIterable(keywordToSearch)
+        .flatMap(s -> {return Flux.just(s + " FirstResult " + s + " SecondResult");})
+        .delayElements(Duration.ofSeconds(10));
+    keywordFlatMap.subscribe(System.out::println, 
+            e -> System.out.println("This is a onError"), 
+            () -> System.out.println("This is onComplete"));
+
+    Flux<String> keywordSwitchMap = Flux.fromIterable(keywordToSearch)
+            .switchMap(s -> {return Flux.just(s + " FirstResult " + s + " SecondResult");})
+            .delayElements(Duration.ofSeconds(10));
+    keywordSwitchMap.subscribe(System.out::println, 
+            e -> System.out.println("This is a onError"), 
+            () -> System.out.println("This is onComplete"));
+
+}
+```
+
+### Combining Mono and Flux
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    Flux<String> abc = Flux.just("A", "B", "C")
+            .delayElements(Duration.ofMillis(100));
+
+    Flux<String> def = Flux.just("D", "E", "F")
+            .delayElements(Duration.ofMillis(125));
+
+    // A B C D E F
+    Flux<String> concat = Flux.concat(abc, def);
+    abc.concatWith(def);
+    concat.subscribe(System.out::println);
+    abc.subscribe(System.out::println);
+
+    // A D B E C F
+    Flux<String> merge = Flux.merge(abc, def);
+    abc.concatWith(def);
+    merge.subscribe(System.out::println);
+    abc.subscribe(System.out::println);
+
+    // AD, BE, CF
+    Flux<String> zip = Flux.zip(abc, def, (first, second) -> first.concat(second));
+    zip.subscribe(System.out::println);
+}
+```
+
+### Transform from Mono to Flux
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    Flux<Object> monoNameFlatMapMany = Mono.just("alex")
+            .map(String::toUpperCase)
+            .filter(s -> s.length() > 1)  						// Mono<String>
+            .flatMapMany(t -> Mono.just(List.of(t.split(""))) 	// Mono<List<String>> -> Flux<String>
+                    .delayElement(Duration.ofSeconds(1)));
+    monoNameFlatMapMany.subscribe(System.out::println);
+    
+    Mono<String> monoNameTransform = Mono.just("alex")
+        .transform(t -> t.map(String::toUpperCase)
+                .filter(s -> s.length() > 1));
+    
+    monoNameTransform.subscribe(System.out::println);    
+}
+```
+
+### Default values
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    // Setting default values
+    Mono<String> monoNameDefault = Mono.just("alex")
+            .map(String::toUpperCase)
+            .filter(s -> s.length() > 1)
+            .defaultIfEmpty("ecneb");
+    monoNameDefault.subscribe(System.out::println);
+
+    Mono<String> monoNameDefaultSwitch = Mono.just("alex")
+            .map(String::toUpperCase)
+            .filter(s -> s.length() > 1)
+            .switchIfEmpty(Mono.just("ecneb"));
+    monoNameDefaultSwitch.subscribe(System.out::println);
+}
+```
+
+### Using doOn callbacks
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    Flux<String> doOnCallbacks = Flux.just("alex", "ben", "chloe")
+    .map(s -> s.toUpperCase())
+    .map(String::toUpperCase)
+    .delayElements(Duration.ofMillis(500))
+    .filter(s -> s.length() > 3)
+    .map(s -> s.length() + "-" + s)
+    .doOnNext(name -> {
+        System.out.println("name is : " + name);
+        name = name.toLowerCase();
+    })
+    .doOnSubscribe(s -> {
+        System.out.println("Subscription  is : " + s);
+    })
+    .doOnComplete(() -> {
+        System.out.println("Completed sending all the items.");
+    })
+    .doFinally((signalType) -> {
+        System.out.println("value is : " + signalType);
+    })
+    .defaultIfEmpty("default");
+
+    doOnCallbacks.subscribe(System.out::println);
+}
+```
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    // Category 1: Recover from an Exception
+        // onErrorReturn
+        // onErrorResume
+        // onErrorContinue
+
+    Flux<String> onErrorReturn = Flux.just("A", "B", "C")
+            .concatWith(Flux.error(new IllegalStateException("Exception Occurred"))).onErrorReturn("D");
+    onErrorReturn.subscribe(System.out::println);
+
+    Flux<String> onErrorResume = Flux.just("A", "B", "C")
+            .concatWith(Flux.error(new IllegalStateException("Exception Occurred")))
+            .onErrorResume((e) -> {
+                System.out.println("Exception is " + e);
+                if (e instanceof IllegalStateException) {
+                    return Flux.just("D", "E", "F");
+                } else {
+                    return Flux.error(e);
+                }
+            });
+    onErrorResume.subscribe(System.out::println);
+
+    Flux<String> onErrorContinue = Flux.just("A", "B", "C")
+            .map(name -> {
+                if (name.equals("B")) {
+                    throw new IllegalStateException("Exception Occurred");
+                }
+                return name;
+            })
+            .concatWith(Flux.just("D"))
+            .onErrorContinue((exception, value) -> {
+                System.out.println("Value is : " + value);
+                System.out.println("Exception is : " + exception.getMessage());
+            });
+    onErrorContinue.subscribe(System.out::println);
+
+    // Category 2: Take an action on the exception and re throw the exception
+        // onErrorMap
+        // doOnError
+
+    Flux<String> onErrorMap = Flux.just("A", "B", "C")
+            .map(name -> {
+                if (name.equals("B")) {
+                    throw new IllegalStateException("Exception Occurred");
+                }
+                return name;
+            })
+            .onErrorMap((exception) -> new NullPointerException(exception.getMessage()));
+    onErrorMap.subscribe(System.out::println);
+    
+    Flux<String> doOnError = Flux.just("A", "B", "C")
+            .concatWith(Flux.error(new IllegalStateException("Exception Occurred")))
+            //Write any logic you would like to perform when an exception happens
+            .doOnError((e) -> System.out.println("Exception is : " + e));
+    doOnError.subscribe(System.out::println);
+}
+```
+
+### repeat() retry() and retryWhen()
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    Flux<String> onErrorReturn = Flux.just("A", "B", "C")
+            .concatWith(Flux.error(new IllegalStateException("Exception Occurred")))
+            // .retry()
+            // .retry(3)
+            // .repeat() USED TO REPEAT EXISTING SEQUENCE, THIS OPERATOR WORKS AS LONG AS NO EXCEPTION IS THROWED
+            .retryWhen(Retry.fixedDelay(3, Duration.ofMillis(10000)) // retry 3 times and wait 10s
+                    .filter(IllegalStateException.class::isInstance)
+                    .onRetryExhaustedThrow(((retryBackoffSpec, retrySignal) -> Exceptions.propagate(retrySignal.failure()))));
+    onErrorReturn.subscribe(System.out::println);
+}
+```
