@@ -1755,6 +1755,8 @@ public void run(String... args) throws Exception {
 }
 ```
 
+### Handling errors
+
 ```java
 @Override
 public void run(String... args) throws Exception {
