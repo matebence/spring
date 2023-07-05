@@ -117,7 +117,7 @@ public class HeavyTask extends Thread {
     }
 }
 
-public class ComplexTask implements  Runnable {
+public class ComplexTask implements Runnable {
 
     @Override
     public void run() {
@@ -1534,13 +1534,6 @@ public interface Processor<T, R> extends Subscriber<T>, Publisher<R> {
 }
 ```
 
-Hot vs Cold streams:
-- **Cold** - streams is a type of stream which emits the elements from beginning to end for every new subscription
-    - HTTP call
-    - DB call
-- **Hot** - streams data is emitted continiously. Any new subscriber will only get the currenct state of the Reactive stream
-    - Uber driver tracking
-
 ### just() defer() fromSupplier() fromCallable()
 
 ```java
@@ -1831,5 +1824,255 @@ public void run(String... args) throws Exception {
                     .filter(IllegalStateException.class::isInstance)
                     .onRetryExhaustedThrow(((retryBackoffSpec, retrySignal) -> Exceptions.propagate(retrySignal.failure()))));
     onErrorReturn.subscribe(System.out::println);
+}
+```
+
+### Schedulers & Delay
+
+publishOn & subscribeOn are convenient methods in Project Reactor which accepts any of the above Schedulers to change the task execution context for the operations in a reactive pipeline. While subscribeOn forces the source emission to use specific Schedulers, publishOn changes Schedulers for all the downstream operations in the pipeline as shown below
+
+![publishOn vs subscribeOn](https://raw.githubusercontent.com/matebence/spring/parallel/docs/publishOn_vs_subscribeOn.png)
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    List<String> names = List.of("Ben", "Alex", "Cloe");
+    
+    // Immediate - single thread (main)
+    Flux<String> immediateFlux = Flux.fromIterable(names)
+        .delayElements(Duration.ofSeconds(1))
+        .map(t -> {
+            System.out.println(Thread.currentThread().getName());
+            return new StringBuffer(t).reverse().toString();
+        })
+        .subscribeOn(Schedulers.boundedElastic())
+        .publishOn(Schedulers.immediate())
+        .map(t -> {
+            System.out.println(Thread.currentThread().getName());
+            return t.toUpperCase();
+        });
+    
+    immediateFlux.subscribe(System.out::println);
+    System.out.println("----------------------");
+    
+    // Parallel - pool of threads
+    Flux<String> parallelFlux = Flux.fromIterable(names)
+        .delayElements(Duration.ofSeconds(1))
+        .map(t -> {
+            System.out.println(Thread.currentThread().getName());
+            return new StringBuffer(t).reverse().toString();
+        })
+        .subscribeOn(Schedulers.single())
+        .publishOn(Schedulers.parallel())
+        .map(t -> {
+            System.out.println(Thread.currentThread().getName());
+            return t.toUpperCase();
+        });
+
+    parallelFlux.subscribe(System.out::println);
+    System.out.println("---------------------");
+    
+    // Single - one thread beside main
+    // For heavy computations where we need high COU power we should use parallel
+    Flux<String> singleFlux = Flux.fromIterable(names)
+        .delayElements(Duration.ofSeconds(1))
+        .map(t -> {
+            System.out.println(Thread.currentThread().getName());
+            return new StringBuffer(t).reverse().toString();
+        })
+        .subscribeOn(Schedulers.parallel())
+        .publishOn(Schedulers.single())
+        .map(t -> {
+            System.out.println(Thread.currentThread().getName());
+            return t.toUpperCase();
+        });
+
+    singleFlux.subscribe(System.out::println);
+    System.out.println("---------------------");
+    
+    // Bounded elastic - the number of threads can grow based on the needs
+    // For rest db calls we use boudedElastic
+    Flux<String> boundedElastic = Flux.fromIterable(names)
+        .delayElements(Duration.ofSeconds(1))
+        .map(t -> {
+            System.out.println(Thread.currentThread().getName());
+            return new StringBuffer(t).reverse().toString();
+        })
+        .subscribeOn(Schedulers.immediate())
+        .publishOn(Schedulers.boundedElastic())
+        .map(t -> {
+            System.out.println(Thread.currentThread().getName());
+            return t.toUpperCase();
+        });
+
+    boundedElastic.subscribe(System.out::println);
+    System.out.println("---------------------");
+}
+```
+
+### Backpressure
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    Flux<Integer> numbers = Flux.range(1, 100);
+    numbers
+        // .onBackpressureDrop(x -> System.out.println("Droppped " + x))
+    
+        // In case that our strategies of sampling or batching elements do not 
+        // help with filling up a buffer, we need to implement a strategy of handling
+        // cases when a buffer is filling up.
+        .onBackpressureBuffer(10, BufferOverflowStrategy.ERROR)
+        .subscribe(new BaseSubscriber() {
+
+        @Override
+        protected void hookOnSubscribe(Subscription subscription) {
+            // request(2);
+            for (int i = 0; i < 40; i++) {
+                request(2);
+            }
+        }
+
+        @Override
+        protected void hookOnNext(Object value) {
+            System.out.println(value);
+            // if (value.equals(2)) cancel();
+        }
+
+        @Override
+        protected void hookOnComplete() {
+            System.out.println("hookOnComplete");
+        }
+
+        @Override
+        protected void hookOnError(Throwable throwable) {
+            System.out.println("hookOnError");
+        }
+
+        @Override
+        protected void hookOnCancel() {
+            System.out.println("hookOnCancel");
+        }
+
+        @Override
+        protected void hookFinally(SignalType type) {
+            System.out.println("hookFinally");
+        }
+    });
+}
+```
+
+### Parallelism
+
+The idea behind parallelFlux is to leverage the multi-core processor that we have in todays hardware
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    List<String> names = List.of("Ben", "Alex", "Cloe");
+
+    ParallelFlux<String> fluxRunOn = Flux.fromIterable(names)
+        //.publishOn(Schedulers.parallel()) it would take 30s
+        .parallel() // now it takes only 1s
+        .runOn(Schedulers.boundedElastic())
+        .map(this::upperCase)
+        .log();
+    
+    fluxRunOn.subscribe(System.out::println);
+    
+    // The same can be achieved via flatMap, but the order is unpredictable
+    Flux<String> flatMap = Flux.fromIterable(names)
+            .flatMap(name -> Mono.just(name)
+                    .map(this::upperCase)
+                    .subscribeOn(Schedulers.parallel()))
+                    .log();
+    
+    flatMap.subscribe(System.out::println);
+    
+    // Solution is to used flatMapSequential
+    Flux<String> flatMapSequential = Flux.fromIterable(names)
+            .flatMapSequential(name -> {
+                return Mono.just(name)
+                        .map(this::upperCase)
+                        .subscribeOn(Schedulers.parallel());
+
+            }).log();
+    
+    flatMapSequential.subscribe(System.out::println);
+}
+
+private String upperCase(String name) {
+    try {
+        Thread.sleep(10000);
+    } catch (InterruptedException e) {
+        e.printStackTrace();
+    }
+    return name.toUpperCase();
+}
+```
+
+### Hot vs Cold streams
+- **Cold** - streams is a type of stream which emits the elements from beginning to end for every new subscription
+    - HTTP call
+    - DB call
+- **Hot** - streams data is emitted continiously. Any new subscriber will only get the currenct state of the Reactive stream
+    - Uber driver tracking
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    System.out.println("---------------COLD--------------");
+    Flux<Integer> numbers = Flux.range(1, 10);
+
+    numbers.subscribe(s -> System.out.println("Subscriber 1 : " + s)); //emits the value from beginning
+    numbers.subscribe(s -> System.out.println("Subscriber 2 : " + s)); //emits the value from beginning
+    
+    System.out.println("---------------HOT--------------");
+    
+    Flux<Integer> numbersFlux = Flux.range(1, 10)
+            .delayElements(Duration.ofSeconds(1));
+
+    // ConnectableFlux<Integer> connectableFlux = numbersFlux.publish();
+    // connectableFlux.connect();
+    
+    // ConnectableFlux<Integer> connectableFlux = stringFlux.publish().autoConnect(2); // we are waitfor atleas two subscribers
+    
+    ConnectableFlux<Integer> connectableFlux = stringFlux.publish().refCount(2); // we have least then two subscribers it will stop sending events
+
+    Thread.sleep(3000);
+    connectableFlux.subscribe(s -> System.out.println("Subscriber 1 : " + s));
+    Thread.sleep(1000);
+    connectableFlux.subscribe(s -> System.out.println("Subscriber 2 : " + s)); // does not get the values from beginning
+    Thread.sleep(10000);
+}
+```
+
+### Using create and generate
+
+```java
+@Override
+public void run(String... args) throws Exception {
+    List<String> letters = List.of("a", "b", "c");
+    
+    // Used to bridge and existig APi in to the Reactive World
+	// This is Asynchronous and multihtreaded
+    Flux<String> createFlux = Flux.create(sink -> {
+        letters.forEach(sink::next);
+        sink.complete();
+    }, FluxSink.OverflowStrategy.BUFFER);
+    createFlux.subscribe(System.out::println);
+    
+     // this operator takes a initial value and a generator function as an input and continiously emit values
+     // Its also called Synchronous generator
+    Flux<Integer> generateFlux = Flux.generate(
+            () -> 1,
+            (state, sink) -> {
+                sink.next(state * 2);
+                if (state == 10) {
+                    sink.complete();
+                }
+                return state + 1;
+            });
+    generateFlux.subscribe(System.out::println);
 }
 ```
