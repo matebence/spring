@@ -1,3 +1,18 @@
+## Setting up MySQL Container
+
+```bash
+docker run -d -p 3306:3306 --name mysql-docker-container -e MYSQL_ROOT_PASSWORD=spring -e MYSQL_DATABASE=spring -e MYSQL_USER=spring -e MYSQL_PASSWORD=spring mysql/mysql-server:latest
+```
+
+```sql
+CREATE TABLE `orders` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `amount` decimal(10,0) NOT NULL,
+  `placed_date` datetime NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf32;
+```
+
 ## Concurrency and Parallelims API's in Java
 	
 - Java 1 (Single Core)
@@ -1497,6 +1512,14 @@ Reactive types:
 
 Reactive Stream specification, it has four interfaces:
 - **Publisher** - one which provides data
+
+```xml
+<dependency>
+    <groupId>io.projectreactor</groupId>
+    <artifactId>reactor-core</artifactId>
+    <version>3.4.9</version>
+</dependency>
+```
 
 ```java
 public interface Publisher<T> {
