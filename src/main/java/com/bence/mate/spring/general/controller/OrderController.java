@@ -1,21 +1,22 @@
-package com.bence.mate.spring.controller;
+package com.bence.mate.spring.general.controller;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.http.MediaType;
 
-import com.bence.mate.spring.entity.Order;
+import com.bence.mate.spring.general.entity.Order;
 
 import java.util.stream.Collectors;
 import java.util.Random;
 import java.util.List;
 
+import reactor.core.publisher.Flux;
+import lombok.extern.slf4j.Slf4j;
+
 import java.time.LocalDateTime;
 import java.time.Duration;
-
-import lombok.extern.slf4j.Slf4j;
-import reactor.core.publisher.Flux;
 
 @Slf4j
 @RestController

@@ -1,10 +1,10 @@
-package com.bence.mate.spring.service;
+package com.bence.mate.spring.general.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.bence.mate.spring.repository.OrderRepository;
-import com.bence.mate.spring.entity.Order;
+import com.bence.mate.spring.general.repository.OrderRepository;
+import com.bence.mate.spring.general.entity.Order;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;

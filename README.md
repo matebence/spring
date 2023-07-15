@@ -1,7 +1,11 @@
-## Setting up MySQL Container
+### Setting up Containers
 
 ```bash
 docker run -d -p 3306:3306 --name mysql-docker-container -e MYSQL_ROOT_PASSWORD=spring -e MYSQL_DATABASE=spring -e MYSQL_USER=spring -e MYSQL_PASSWORD=spring mysql/mysql-server:latest
+```
+
+```bash
+docker run -d -p 27017:27017 --name spring-mongo mongo:latest
 ```
 
 ```sql
@@ -11,6 +15,24 @@ CREATE TABLE `orders` (
   `placed_date` datetime NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf32;
+```
+
+```sql
+create table users (
+    id bigint auto_increment,
+    name varchar(50),
+    balance int,
+    primary key (id)
+);
+
+create table user_transactions (
+    id bigint auto_increment,
+    user_id bigint,
+    amount int,
+    transaction_date timestamp,
+    primary key (id),
+    foreign key (user_id) references users (id) on delete cascade
+);
 ```
 
 ## Concurrency and Parallelims API's in Java

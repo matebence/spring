@@ -1,4 +1,4 @@
-package com.bence.mate.spring.component;
+package com.bence.mate.spring.general.component;
 
 import org.springframework.web.reactive.function.server.ServerResponse;
 import org.springframework.web.reactive.function.server.ServerRequest;

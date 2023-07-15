@@ -1,10 +1,11 @@
-package com.bence.mate.spring.controller;
+package com.bence.mate.spring.general.controller;
 
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
+import com.bence.mate.spring.general.entity.Error;
+
 import org.springframework.http.ResponseEntity;
-import com.bence.mate.spring.entity.Error;
 
 @ControllerAdvice
 public class OrderErrorHandler {

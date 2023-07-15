@@ -1,4 +1,4 @@
-package com.bence.mate.spring.component;
+package com.bence.mate.spring.general.component;
 
 import org.springframework.web.reactive.function.server.ServerResponse;
 import org.springframework.web.reactive.function.server.ServerRequest;
@@ -8,8 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.http.MediaType;
 
-import com.bence.mate.spring.service.OrderService;
-import com.bence.mate.spring.entity.Order;
+import com.bence.mate.spring.general.service.OrderService;
+import com.bence.mate.spring.general.entity.Order;
 
 import reactor.core.publisher.Mono;
 import java.time.Duration;

@@ -1,4 +1,4 @@
-package com.bence.mate.spring.entity;
+package com.bence.mate.spring.general.entity;
 
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;

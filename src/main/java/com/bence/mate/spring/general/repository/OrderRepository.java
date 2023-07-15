@@ -1,9 +1,9 @@
-package com.bence.mate.spring.repository;
+package com.bence.mate.spring.general.repository;
 
 import org.springframework.data.r2dbc.repository.R2dbcRepository;
 import org.springframework.stereotype.Repository;
 
-import com.bence.mate.spring.entity.Order;
+import com.bence.mate.spring.general.entity.Order;
 
 @Repository
 public interface OrderRepository extends R2dbcRepository<Order, Long> {

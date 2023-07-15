@@ -1,4 +1,4 @@
-package com.bence.mate.spring.entity;
+package com.bence.mate.spring.general.entity;
 
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
