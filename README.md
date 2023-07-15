@@ -41,7 +41,8 @@ implements BeforeAllCallback, AfterAllCallback, TestInstancePostProcessor, Befor
 - Service test
 	- **@SpringBootTest(webEnvironment = WebEnvironment.NONE)** - annotation loads the full application context so that we can able to test various components
 - Controller test (integration)
-	- **@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)**
+	- **@SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)** - With RANDOM_PORT we instruct Spring to start the embedded servlet container on the random port.
+ 	- **@SpringBootTest(webEnvironment = WebEnvironment.DEFINED_PORT)** - With DEFINED_PORT we instruct Spring to start the embedded servlet container on the pre-defined port. By default, that's port 8080, but we can configure this port with the server. port property.  
 - Controller test (unit)
 	- **@SpringBootTest(webEnvironment = WebEnvironment.MOCK)**
 	- **@WebMvcTest** - annotation loads only the specified controller and its dependencies only without loading the entire application
