@@ -6,29 +6,32 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.CommandLineRunner;
 
 import com.bence.mate.spring.project.product.repository.ProductRepository;
 import com.bence.mate.spring.project.user.repository.UserRepository;
+import com.bence.mate.spring.project.product.dto.ProductDto;
 import com.bence.mate.spring.project.product.entity.Product;
-import com.bence.mate.spring.project.user.entity.User;
 
 import java.util.concurrent.ThreadLocalRandom;
-import java.time.Duration;
-import java.util.List;
 
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+import lombok.extern.slf4j.Slf4j;
 
+import java.time.Duration;
+
+@Slf4j
 @SpringBootApplication
-@EntityScan("com.bence.mate.spring.general.entity")
+@ComponentScan({"com.bence.mate.spring"})
 @EnableMongoRepositories("com.bence.mate.spring.project.product.entity")
-@EnableR2dbcRepositories({"com.bence.mate.spring.general.repository", "com.bence.mate.spring.project"})
-@ComponentScan({"com.bence.mate.spring", "com.bence.mate.spring.general", "com.bence.mate.spring.project"})
+@EntityScan({"com.bence.mate.spring.general.entity", "com.bence.mate.spring.project.order.entity"})
+@EnableR2dbcRepositories({"com.bence.mate.spring.general.repository", "com.bence.mate.spring.project.user.repository", "com.bence.mate.spring.project.order.repository"})
 public class Application implements CommandLineRunner {
 
-	
+	@Autowired
+	private Flux<ProductDto> flux;
+
 	@Autowired
 	private UserRepository userRepository;
 
@@ -41,6 +44,9 @@ public class Application implements CommandLineRunner {
 
 	@Override
 	public void run(String... args) throws Exception {
+		flux.subscribe(product -> log.info("{}", product));
+		
+		/* DUMMY DATA FILL UP
 		userRepository.saveAll(List.of(
 				User.builder().name("sam").balance(1000).build(),
 				User.builder().name("mike").balance(1200).build(),
@@ -54,7 +60,7 @@ public class Application implements CommandLineRunner {
 		Product p4 = Product.builder().description("headphone").price(100).build();
 
 		Flux.just(p1, p2, p3, p4).concatWith(newProducts()).flatMap(p -> productRepository.insert(Mono.just(p)))
-				.subscribe(System.out::println);
+				.subscribe(System.out::println); */
 	}
 
 	private Flux<Product> newProducts() {

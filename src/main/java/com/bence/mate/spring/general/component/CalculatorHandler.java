@@ -29,10 +29,10 @@ public class CalculatorHandler {
         );
     }
 
-    private Mono<ServerResponse> process(ServerRequest request,
-                                         BiFunction<Integer, Integer, Mono<ServerResponse>> opLogic){
+    private Mono<ServerResponse> process(ServerRequest request, BiFunction<Integer, Integer, Mono<ServerResponse>> opLogic){
         int a = getValue(request, "a");
         int b = getValue(request, "b");
+        
         return opLogic.apply(a, b);
     }
 

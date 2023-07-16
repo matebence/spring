@@ -35,6 +35,17 @@ create table user_transactions (
 );
 ```
 
+```sql
+create table purchase_orders (
+    id bigint auto_increment,
+    product_id varchar(50),
+    user_id bigint,
+    amount int,
+    status varchar(50),
+    primary key (id)
+);
+```
+
 ## Concurrency and Parallelims API's in Java
 	
 - Java 1 (Single Core)

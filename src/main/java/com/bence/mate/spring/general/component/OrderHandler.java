@@ -6,6 +6,7 @@ import org.springframework.web.reactive.function.BodyInserters;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
 import com.bence.mate.spring.general.service.OrderService;
@@ -43,7 +44,7 @@ public class OrderHandler {
 	public Mono<ServerResponse> createOrder(ServerRequest serverRequest) {
 		Mono<Order> newOrder = serverRequest.bodyToMono(Order.class);
 		
-		return ServerResponse.ok()
+		return ServerResponse.status(HttpStatus.CREATED)
 				.contentType(MediaType.APPLICATION_JSON)
 				.body(newOrder.flatMap(t -> orderService.saveOrder(t)), Order.class);
 	}

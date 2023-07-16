@@ -30,10 +30,9 @@ public class TransactionHandler {
 
 	public Mono<ServerResponse> createTransaction(ServerRequest serverRequest) {
 		Mono<TransactionRequestDto> transactionDtoMono = serverRequest.bodyToMono(TransactionRequestDto.class);
-
-		return transactionDtoMono.flatMap(u -> 
-				ServerResponse.status(HttpStatus.CREATED)
-					.contentType(MediaType.APPLICATION_JSON)
-					.body(transactionService.createTransaction(u), TransactionResponseDto.class));
+		
+		return ServerResponse.status(HttpStatus.CREATED)
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(transactionDtoMono.flatMap(transactionService::createTransaction), TransactionResponseDto.class);
 	}
 }

@@ -34,21 +34,20 @@ public class UserHandler {
 
 	public Mono<ServerResponse> createUser(ServerRequest serverRequest) {
 		Mono<UserDto> userDtoMono = serverRequest.bodyToMono(UserDto.class);
-
-		return userDtoMono.flatMap(u -> 
-				ServerResponse.status(HttpStatus.CREATED)
-					.contentType(MediaType.APPLICATION_JSON)
-					.body(userService.createUser(userDtoMono), UserDto.class));
+		
+		return ServerResponse.status(HttpStatus.CREATED)
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(userService.createUser(userDtoMono), UserDto.class);
+	
 	}
 
 	public Mono<ServerResponse> updateUser(ServerRequest serverRequest) {
 		Integer id = Integer.valueOf(serverRequest.pathVariable("id"));
 		Mono<UserDto> userDtoMono = serverRequest.bodyToMono(UserDto.class);
 
-		return userDtoMono.flatMap(u -> 
-				ServerResponse.status(HttpStatus.OK)
-					.contentType(MediaType.APPLICATION_JSON)
-					.body(userService.updateUser(id, userDtoMono), UserDto.class));
+		return ServerResponse.ok()
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(userService.updateUser(id, userDtoMono), UserDto.class);
 	}
 
 	public Mono<ServerResponse> deleteUser(ServerRequest serverRequest) {
