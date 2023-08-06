@@ -1,7 +1,36 @@
 ## Setting up MySQL Container
 
 ```bash
-docker run -d -p 3306:3306 --name mysql-docker-container -e MYSQL_ROOT_PASSWORD=spring -e MYSQL_DATABASE=spring -e MYSQL_USER=spring -e MYSQL_PASSWORD=spring mysql/mysql-server:latest
+docker run -d -p 3307:3306 --name mysql-student-container -e MYSQL_ROOT_PASSWORD=student -e MYSQL_DATABASE=student -e MYSQL_USER=student -e MYSQL_PASSWORD=student mysql/mysql-server:latest
+```
+
+```bash
+docker run -d -p 3306:3306 --name mysql-spring-container -e MYSQL_ROOT_PASSWORD=spring -e MYSQL_DATABASE=spring -e MYSQL_USER=spring -e MYSQL_PASSWORD=spring mysql/mysql-server:latest
+```
+
+```sql
+CREATE TABLE student.student (
+	id BIGINT auto_increment NOT NULL,
+	firstName varchar(100) NULL,
+	lastName varchar(100) NULL,
+	email varchar(100) NULL,
+	CONSTRAINT student_PK PRIMARY KEY (id)
+)
+ENGINE=InnoDB
+DEFAULT CHARSET=utf8mb4
+COLLATE=utf8mb4_0900_ai_ci;
+```
+
+```sql
+INSERT INTO student.student
+(id, firstName, lastName, email)
+VALUES(1, 'A', 'B', 'a@localhost.com');
+INSERT INTO student.student
+(id, firstName, lastName, email)
+VALUES(2, 'C', 'D', 'c@localhost.com');
+INSERT INTO student.student
+(id, firstName, lastName, email)
+VALUES(3, 'E', 'F', 'e@localhost.com');
 ```
 
 ## Spring Batch

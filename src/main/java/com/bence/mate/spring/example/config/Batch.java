@@ -26,7 +26,7 @@ import org.springframework.batch.core.Step;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-@Configuration
+@Configuration(value = "Example")
 public class Batch {
 
 	/* DEPRECATED VERSION
