@@ -116,6 +116,18 @@ Example
     - This can be result in duplicate processing of messages. Make sure your processing is idempotent
 - Exactly once:
     - Can be achived for Kafka to Kafka, using Kafka Streams API
+    
+#### Additional client besides Consumer & Producer
+
+**Kafka Streams** provides an API for message streaming that incorporates a framework for processing, enriching, and transforming messages. It is a fully scalable, reliable, and maintainable library enabling fast processing of unbounded datasets in real-time with low latency. 
+
+**Kafka Connect** is a framework for connecting Kafka with external systems such as databases, key-value stores, search indexes, and file systems, using so-called **Connectors**.
+
+Kafka Connectors are ready-to-use components, which can help us to import data from external systems into Kafka topics and export data from Kafka topics into external systems. We can use existing connector implementations for common data sources and sinks or implement our own connectors.
+
+A source connector collects data from a system. Source systems can be entire databases, streams tables, or message brokers. A source connector could also collect metrics from application servers into Kafka topics, making the data available for stream processing with low latency.
+
+A **Kafka sink connector** delivers data from Kafka topics into other systems, which might be indexes such as Elasticsearch, batch systems such as Hadoop, or any kind of database.
 
 ### Zookeper
 
@@ -157,6 +169,29 @@ nano server.properties
 cd bin
 ./zookeeper-server-start.sh ../config/zookeeper.properties
 ./kafka-server-start.sh ../config/server.properties
+
+# Multi cluster setup
+
+cd config
+
+mv server.properties server-0.properties
+cp server-0.properties server-1.properties
+
+# log.dirs=\data\kafka-0
+# listeners=PLAINTEXT://:9092
+# broker.id=0
+
+vi server-0.properties
+
+# log.dirs=\data\kafka-1
+# listeners=PLAINTEXT://:9093
+# broker.id=1
+
+vi server-1.properties
+
+cd data
+mv kafka kafka-0
+mkdir kafka-1
 ```
 
 ### Create topics
