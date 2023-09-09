@@ -3,6 +3,9 @@ spring:
     active: local
 server:
   port: 8080
+topics:
+  retry: 'library-events.RETRY'
+  dlt: 'library-events.DLT'
 ---
 spring:
   config:
@@ -22,6 +25,10 @@ spring:
         -   localhost:9092,localhost:9093
       key-serializer: org.apache.kafka.common.serialization.IntegerSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        acks: all
+        retries: 10
+        retry.backoff.ms: 1000
     admin:
       properties:
         bootstrap-servers: localhost:9092,localhost:9093
@@ -34,7 +41,48 @@ spring:
     database: h2
     database-platform: org.hibernate.dialect.H2Dialect
     generate-ddl: true
+    properties:
+      hibernate:
+        globally_quoted_identifiers: true
   h2:
     # touch testdb.mv.db
+    # jdbc:h2:mem:testdb
     console: 
+      enabled: true
+---
+spring:
+  config:
+    activate:
+      on-profile: ssl
+  kafka:
+    template:
+      default-topic: library-events
+    consumer:
+      bootstrap-servers: localhost:9095,localhost:9096,localhost:9097
+      key-deserializer: org.apache.kafka.common.serialization.IntegerDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      group-id: library-events-listener-group
+      ssl:
+        trust-store-location: file:/ssl/client.truststore.jks
+        trust-store-password: springkafka
+        key-store-location: file:/ssl/client.keystore.jks
+        key-store-password: springkafka
+    producer:
+      bootstrap-servers:
+        -   localhost:9095,localhost:9096,localhost:9097
+      key-serializer: org.apache.kafka.common.serialization.IntegerSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    properties:
+      security:
+        protocol: SSL
+      ssl.endpoint.identification.algorithm:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+  jpa:
+    database: h2
+    database-platform: org.hibernate.dialect.H2Dialect
+    generate-ddl: true
+  h2:
+    console:
       enabled: true

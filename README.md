@@ -487,3 +487,133 @@ public class Consumer {
 ![Social](https://raw.githubusercontent.com/matebence/spring/kafka/docs/driver.png)
 
 ![Driver](https://raw.githubusercontent.com/matebence/spring/kafka/docs/social.png)
+
+
+### Spring project snippets
+
+#### Important producer configurations
+
+- acks
+  - 0 - Guarantees message is written to the leader (Default)
+  - 1 - No guarantee (Not recommended) 
+  - all - Guarantees message is wirtten to leader and to all the replicas
+- retries - Attempting to retry a failed request to a given topic partition
+- retry.backoff.ms - The time to wait before attempting to retry a failed request to a given topic partition
+
+```bash
+.\zookeeper-server-start.bat ..\..\config\zookeeper.properties
+.\kafka-server-start.bat ..\..\config\server-0.properties
+.\kafka-server-start.bat ..\..\config\server-1.properties
+```
+
+```bash
+.\kafka-topics.bat --bootstrap-server localhost:9092 --topic library-events.RETRY --create --partitions 3 --replication-factor 1
+.\kafka-topics.bat --bootstrap-server localhost:9092 --topic library-events.DLT --create --partitions 3 --replication-factor 1
+.\kafka-topics.bat --bootstrap-server localhost:9092 --topic library-events --create --partitions 3 --replication-factor 1
+.\kafka-console-consumer.bat --bootstrap-server localhost:9092 --topic library-events --from-beginning
+```
+
+#### POST WITH-NULL-LIBRARY-EVENT-ID
+
+```bash
+curl -i \
+-d '{"libraryEventId":null,"book":{"bookId":456,"bookName":"Kafka Using Spring Boot","bookAuthor":"Dilip"}}' \
+-H "Content-Type: application/json" \
+-X POST http://localhost:8080/v1/libraryevent
+```
+
+#### PUT WITH ID - 1
+
+```bash
+curl -i \
+-d '{"libraryEventId":1,"book":{"bookId":456,"bookName":"Kafka Using Spring Boot 2.X","bookAuthor":"Dilip"}}' \
+-H "Content-Type: application/json" \
+-X PUT http://localhost:8080/v1/libraryevent
+```
+
+```bash
+curl -i \
+-d '{"libraryEventId":2,"book":{"bookId":456,"bookName":"Kafka Using Spring Boot 2.X","bookAuthor":"Dilip"}}' \
+-H "Content-Type: application/json" \
+-X PUT http://localhost:8080/v1/libraryevent
+```
+
+#### PUT WITH ID
+
+```bash
+curl -i \
+-d '{"libraryEventId":123,"book":{"bookId":456,"bookName":"Kafka Using Spring Boot","bookAuthor":"Dilip"}}' \
+-H "Content-Type: application/json" \
+-X PUT http://localhost:8080/v1/libraryevent
+```
+
+```bash
+curl -i \
+-d '{"libraryEventId":999,"book":{"bookId":456,"bookName":"Kafka Using Spring Boot","bookAuthor":"Dilip"}}' \
+-H "Content-Type: application/json" \
+-X PUT http://localhost:8080/v1/libraryevent
+```
+
+```bash
+curl -i \
+-d '{"libraryEventId":2,"book":{"bookId":456,"bookName":"Kafka Using Spring Boot","bookAuthor":"Dilip"}}' \
+-H "Content-Type: application/json" \
+-X PUT http://localhost:8080/v1/libraryevent
+```
+
+#### PUT WITHOUT ID
+
+```bash
+curl -i \
+-d '{"libraryEventId":null,"book":{"bookId":456,"bookName":"Kafka Using Spring Boot","bookAuthor":"Dilip"}}' \
+-H "Content-Type: application/json" \
+-X PUT http://localhost:8080/v1/libraryevent
+```
+
+```bash
+# PW: springkafka
+# Generate keystore
+keytool -keystore server.keystore.jks -alias localhost -validity 365 -genkey -keyalg RSA
+
+# Read the keystore
+keytool -list -v -keystore server.keystore.jks
+
+# Generating CA
+openssl req -new -x509 -keyout ca-key -out ca-cert -days 365 -subj "/CN=local-security-CA"
+
+# Certificate Signing Request(CSR)
+keytool -keystore server.keystore.jks -alias localhost -certreq -file cert-file
+
+# Signing the certificate
+openssl x509 -req -CA ca-cert -CAkey ca-key -in cert-file -out cert-signed -days 365 -CAcreateserial -passin pass:springkafka
+
+#  Adding the Signed Cert in to the KeyStore file
+keytool -keystore server.keystore.jks -alias CARoot -import -file ca-cert
+keytool -keystore server.keystore.jks -alias localhost -import -file cert-signed
+
+# Verify we should see 'Your keystore contains 2 entries'
+keytool -list -v -keystore server.keystore.jks
+
+# Copy the path into server=*.properties
+
+# listeners=PLAINTEXT://:9093,SSL://:9094
+# ssl.truststore.location=<location>/server.keystore.jks
+# ssl.keystore.password=springkafka
+# ssl.key.password=springkafka
+# ssl.endpoint.identification.algorithm=
+
+# Add client-ssl properties
+
+cd kafka/config
+touch client-ssl.properties
+
+# security.protocol=SSL
+# ssl.truststore.location=<location>/client.truststore.jks
+# ssl.truststore.password=password
+# ssl.truststore.type=JKS
+
+# Start consumer and producer
+
+./kafka-console-producer.sh --broker-list localhost:9092 --topic first_topic --producer-property acks=all --producer.config ../config/client-ssl.properties
+./kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic first_topic --from-beginning --consumer.config ../config/client-ssl.properties
+```

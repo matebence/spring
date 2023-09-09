@@ -3,10 +3,12 @@ package com.bence.mate.spring;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.SpringApplication;
 
+import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.context.annotation.Bean;
 import org.apache.kafka.clients.admin.NewTopic;
 
+@EnableKafka
 @SpringBootApplication
 public class Application {
 

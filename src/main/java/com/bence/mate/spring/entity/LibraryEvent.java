@@ -1,7 +1,12 @@
 package com.bence.mate.spring.entity;
 
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.Valid;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
 
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
@@ -9,22 +14,25 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
-@Builder
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@Entity
 public class LibraryEvent {
 
+    @Id
     @Getter
     @Setter
-	private Integer libraryEventId;
+    @GeneratedValue
+    private Integer libraryEventId;
 
     @Getter
     @Setter
+    @Enumerated(EnumType.STRING)
     private LibraryEventType libraryEventType;
-    
-    @Valid
+
     @Getter
     @Setter
-    @NotNull
+    @OneToOne(mappedBy = "libraryEvent", cascade = {CascadeType.ALL})
     private Book book;
 }
