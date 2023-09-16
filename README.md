@@ -617,3 +617,536 @@ touch client-ssl.properties
 ./kafka-console-producer.sh --broker-list localhost:9092 --topic first_topic --producer-property acks=all --producer.config ../config/client-ssl.properties
 ./kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic first_topic --from-beginning --consumer.config ../config/client-ssl.properties
 ```
+
+### Kafka Design patterns
+
+```bash
+docker run -d -p 3306:3306 --name mysql-docker-container -e MYSQL_ROOT_PASSWORD=streaming -e MYSQL_DATABASE=streaming -e MYSQL_USER=streaming -e MYSQL_PASSWORD=streaming mysql/mysql-server:latest
+
+./kafka-topics.sh --bootstrap-server localhost:9092 --topic streaming.orders.input --create --partitions 3 --replication-factor 1
+```
+
+```sql
+CREATE TABLE streaming.order_summary (
+	INTERVAL_TIMESTAMP varchar(100) NOT NULL,
+	PRODUCT varchar(100) NOT NULL,
+	TOTAL_VALUE DOUBLE NOT NULL,
+	ID BIGINT auto_increment NOT NULL,
+	CONSTRAINT order_summary_PK PRIMARY KEY (ID)
+)
+ENGINE=InnoDB
+DEFAULT CHARSET=utf8mb4
+COLLATE=utf8mb4_0900_ai_ci;
+```
+
+```xml
+<dependencies>
+    <!--Commons-->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <version>1.18.28</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.4</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.10.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.google.code.gson</groupId>
+      <artifactId>gson</artifactId>
+      <version>2.8.6</version>
+    </dependency>
+
+    <!--Kafka-->
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-streams</artifactId>
+      <version>2.6.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+      <version>2.6.0</version>
+    </dependency>
+
+    <!--SQL & NOSQL-->
+    <dependency>
+      <groupId>mysql</groupId>
+      <artifactId>mysql-connector-java</artifactId>
+      <version>8.0.21</version>
+    </dependency>
+
+    <dependency>
+      <groupId>redis.clients</groupId>
+      <artifactId>jedis</artifactId>
+      <version>3.3.0</version>
+    </dependency>
+
+    <!--Http server-->
+    <dependency>
+      <groupId>org.apache.httpcomponents</groupId>
+      <artifactId>httpclient</artifactId>
+      <version>4.5.10</version>
+    </dependency>
+
+    <!--Prediction-->
+    <dependency>
+      <groupId>edu.stanford.nlp</groupId>
+      <artifactId>stanford-corenlp</artifactId>
+      <version>4.0.0</version>
+    </dependency>
+
+    <dependency>
+      <groupId>edu.stanford.nlp</groupId>
+      <artifactId>stanford-corenlp</artifactId>
+      <version>4.0.0</version>
+      <classifier>models</classifier>
+    </dependency>
+</dependencies>
+```
+
+#### Streaming analytics
+
+![Analytics](https://raw.githubusercontent.com/matebence/spring/kafka/docs/analytics.png)
+
+
+```java
+public class ClassDeSerializer<T> implements Deserializer<T> {
+
+    private final Gson gson =
+            new GsonBuilder()
+                    .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+                    .create();
+
+    private Class<T> destinationClass;
+    private Type reflectionTypeToken;
+
+    /** Default constructor needed by Kafka */
+    public ClassDeSerializer(Class<T> destinationClass) {
+        this.destinationClass = destinationClass;
+    }
+
+    public ClassDeSerializer(Type reflectionTypeToken) {
+        this.reflectionTypeToken = reflectionTypeToken;
+    }
+
+    @Override
+    public void configure(Map<String, ?> props, boolean isKey) {}
+
+    @Override
+    public T deserialize(String topic, byte[] bytes) {
+        if (bytes == null) {
+            return null;
+        }
+        Type type = destinationClass != null ? destinationClass : reflectionTypeToken;
+        return gson.fromJson(new String(bytes), type);
+    }
+
+    @Override
+    public void close() {}
+}
+```
+
+```java
+public class ClassSerializer<T> implements Serializer<T> {
+
+    private final Gson gson =
+            new GsonBuilder()
+                    .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+                    .create();
+
+    public ClassSerializer() {}
+
+    @Override
+    public void configure(Map<String, ?> props, boolean isKey) {}
+
+    @Override
+    public byte[] serialize(String topic, T type) {
+        return gson.toJson(type).getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public void close() {}
+}
+```
+
+```java
+public class KafkaOrdersDataGenerator implements Runnable {
+
+    public static final String ANSI_RESET = "\u001B[0m";
+    public static final String ANSI_GREEN = "\u001B[32m";
+    public static final String ANSI_PURPLE = "\u001B[35m";
+    public static final String ANSI_BLUE = "\u001B[34m";
+
+    //Kafka topic to publish to
+    public static final String TOPIC = "streaming.orders.input";
+
+    public static void main(String[] args) {
+        KafkaOrdersDataGenerator kodg = new KafkaOrdersDataGenerator();
+        kodg.run();
+    }
+
+    public void run() {
+        try {
+            System.out.println("Starting Kafka Orders Generator..");
+            //Wait for the main flow to be setup.
+            Thread.sleep(5000);
+
+            //Setup Kafka Client
+            Properties kafkaProps = new Properties();
+            kafkaProps.put("bootstrap.servers","localhost:9092");
+
+            kafkaProps.put("key.serializer",
+                    "org.apache.kafka.common.serialization.StringSerializer");
+            kafkaProps.put("value.serializer",
+                    "org.apache.kafka.common.serialization.StringSerializer");
+
+            Producer<String,String> myProducer = new KafkaProducer<>(kafkaProps);
+
+            //Define list of Products
+            List<String> products = new ArrayList<String>();
+            products.add("Keyboard");
+            products.add("Mouse");
+            products.add("Monitor");
+
+            //Define list of Prices. Matches the corresponding products
+            List<Double> prices = new ArrayList<>();
+            prices.add(25.00);
+            prices.add(10.5);
+            prices.add(140.00);
+
+            //Define a random number generator
+            Random random = new Random();
+
+            ObjectMapper mapper = new ObjectMapper();
+
+            //Capture current timestamp
+            String currentTime = String.valueOf(System.currentTimeMillis());
+
+            //Create order ID based on the timestamp
+            int orderId = (int)Math.floor(System.currentTimeMillis()/1000);
+
+            //Generate 100 sample order records
+            for(int i=0; i < 100; i++) {
+
+                SalesOrder so = new SalesOrder();
+                so.setOrderId(orderId);
+                orderId++;
+
+                //Generate a random product
+                int randval=random.nextInt(products.size());
+                so.setProduct(products.get(randval));
+
+                //Get product price
+                so.setPrice(prices.get(randval));
+
+                //Generate a random value for number of quantity
+                so.setQuantity(random.nextInt(4) + 1);
+
+                String recKey = String.valueOf(so.getOrderId());
+                String value = mapper.writeValueAsString(so);
+
+                //Create a Kafka producer record
+                ProducerRecord<String, String> record =
+                        new ProducerRecord<String, String>(
+                                TOPIC,
+                                recKey,
+                                value );
+
+                RecordMetadata rmd = myProducer.send(record).get();
+
+                System.out.println(ANSI_PURPLE +
+                        "Kafka Orders Stream Generator : Sending Event : "
+                        + String.join(",", value)  + ANSI_RESET);
+
+                //Sleep for a random time ( 1 - 3 secs) before the next record.
+                Thread.sleep(random.nextInt(2000) + 1000);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+```java
+public class MariaDBManager implements Runnable, Serializable {
+
+    public static final String ANSI_RESET = "\u001B[0m";
+    public static final String ANSI_GREEN = "\u001B[32m";
+    public static final String ANSI_PURPLE = "\u001B[35m";
+    public static final String ANSI_BLUE = "\u001B[34m";
+
+    private Connection conn;
+
+    public static void main(String[] args) {
+        System.out.println("Starting MariaDB DB Manager");
+        MariaDBManager sqldbm = new MariaDBManager();
+        sqldbm.setUp();
+        sqldbm.insertSummary("2020-08-20 00:00:00","Mouse",46.00);
+        sqldbm.run();
+    }
+
+    public void setUp() {
+        System.out.println("Setting up MariaDB Connection");
+        String url = "jdbc:mysql://localhost:3306/streaming";
+        try {
+            conn = DriverManager.getConnection(url,"streaming","streaming");
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void teardown() {
+        try {
+            conn.close();
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    //Used by StreamingAnalytics for writing data into MariaDB
+    public void insertSummary(String timestamp, String product, Double value) {
+        try{
+            String sql = "INSERT INTO order_summary "
+                    + "(INTERVAL_TIMESTAMP, PRODUCT, TOTAL_VALUE) VALUES "
+                    +"( '" + timestamp + "',"
+                    +" '" + product + "',"
+                    + value + ")";
+            //System.out.println(sql);
+            conn.createStatement().execute(sql);
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    //Use to print 5 second statistics from the MariaDB Database
+    @Override
+    public void run() {
+        try {
+            //Find latest ID
+            int latestId=0;
+
+            String idQuery="SELECT IFNULL(MAX(ID),0) as LATEST_ID FROM order_summary";
+            ResultSet rsLatest = conn.createStatement().executeQuery(idQuery);
+
+            while(rsLatest.next()) {
+                latestId = rsLatest.getInt("LATEST_ID");
+            }
+
+            //SQL for periodic stats
+            String selectSql = "SELECT count(*) as TotalRecords, "
+                    + " sum(TOTAL_VALUE) as TotalValue"
+                    + " FROM order_summary"
+                    + " WHERE ID > " + latestId ;
+            System.out.println("Periodic Check Query : " + selectSql);
+
+            while(true) {
+                //Sleep for 5 seconds and then query summary
+                Thread.sleep(5000);
+                ResultSet rs = conn.createStatement().executeQuery(selectSql);
+
+                while (rs.next()) {
+                    System.out.println(ANSI_BLUE
+                            +"---------------------------------------------------------------\n "
+                            +"DB Summary : "
+                            + "Records = " + rs.getInt("TotalRecords") + ", "
+                            + "Value = " + rs.getDouble("TotalValue") + "\n"
+                            +"---------------------------------------------------------------"
+                            + ANSI_RESET);
+                }
+            }
+        } catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+```java
+@ToString
+@NoArgsConstructor
+public class OrderAggregator {
+
+    @Getter
+    @Setter
+    private Double totalValue = 0.0;
+
+    public OrderAggregator add(Double value) {
+        totalValue += value;
+        return this;
+    }
+}
+```
+
+```java
+@Builder
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
+public class SalesOrder {
+
+    @Getter
+    @Setter
+    private int orderId;
+
+    @Getter
+    @Setter
+    private String product;
+
+    @Getter
+    @Setter
+    private int quantity;
+
+    @Getter
+    @Setter
+    private double price;
+}
+```
+
+```java
+public class StreamingAnalytics {
+
+    public static void main (String args[]) {
+        //Initiate MariaDB DB Tracker and start the thread to print
+        //summaries every 5 seconds
+        MariaDBManager dbTracker = new MariaDBManager();
+        dbTracker.setUp();
+        Thread dbThread = new Thread(dbTracker);
+        dbThread.start();
+
+        //Create another MariaDB Connection to update data
+        MariaDBManager dbUpdater = new MariaDBManager();
+        dbUpdater.setUp();
+
+        //Initiate the Kafka Orders Generator
+        KafkaOrdersDataGenerator ordersGenerator = new KafkaOrdersDataGenerator();
+        Thread genThread = new Thread(ordersGenerator);
+        genThread.start();
+
+        System.out.println("******** Starting Streaming  *************");
+        try {
+            final Serde<String> stringSerde = Serdes.String();
+            final Serde<Long> longSerde = Serdes.Long();
+
+            final Serde<SalesOrder> orderSerde
+                    = Serdes.serdeFrom(new ClassSerializer<>(),
+                    new ClassDeSerializer<>(SalesOrder.class));
+            final Serde<OrderAggregator> aggregatorSerde
+                    = Serdes.serdeFrom(new ClassSerializer<>(),
+                    new ClassDeSerializer<>(OrderAggregator.class));
+
+            Properties props = new Properties();
+            props.put(StreamsConfig.APPLICATION_ID_CONFIG,
+                    "streaming-analytics-pipe");
+            props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
+                    "localhost:9092");
+            props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
+                    Serdes.String().getClass());
+            props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+                    Serdes.String().getClass());
+            props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG,"earliest");
+
+            //For immediate results during testing
+            props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
+            props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 100);
+
+            //Initiate the Kafka Streams Builder
+            final StreamsBuilder streamsBuilder = new StreamsBuilder();
+            final ObjectMapper objectMapper = new ObjectMapper();
+
+            //Create the source node for Orders
+            KStream<String, String> orderConsumer = streamsBuilder.stream(KafkaOrdersDataGenerator.TOPIC, Consumed.with(stringSerde, stringSerde));
+
+            //Convert input json to SalesOrder object using Object Mapper
+            KStream<String,SalesOrder> salesOrderObjects = orderConsumer.mapValues((key, value) -> {
+                try {
+                    return objectMapper.readValue(value, SalesOrder.class);
+                } catch (JsonProcessingException e) {
+                    System.out.println("ERROR : Cannot convert JSON " + value);
+                    return null;
+                }
+            });
+
+            //Print objects received
+            salesOrderObjects.peek((key, value) -> {
+               System.out.println("Received Order : " + value);
+            });
+
+            //Create a window of 5 seconds
+            TimeWindows timeWindows = TimeWindows.of(Duration.ofSeconds(5)).grace(Duration.ZERO);
+
+            //Initializer creates a new aggregator for every
+            //Window & Product combination
+            Initializer<OrderAggregator> orderAggregatorInitializer = OrderAggregator::new;
+
+            //Aggregator - Compute total value and call the aggregator
+            Aggregator<String, SalesOrder, OrderAggregator> orderAggregator = (key, value, aggregator) -> aggregator.add(value.getPrice() * value.getQuantity());
+
+            //Perform Aggregation
+            KTable<Windowed<String>,OrderAggregator> productSummary = salesOrderObjects.groupBy((key, value) -> value.getProduct(), Grouped.with(stringSerde, orderSerde))
+                    .windowedBy(timeWindows)
+                    .aggregate(orderAggregatorInitializer,orderAggregator,  //Store output in a materialized store
+                            Materialized.<String, OrderAggregator, WindowStore<Bytes, byte[]>>as("time-windowed-aggregate-store")
+                                    .withValueSerde(aggregatorSerde))
+                    .suppress(Suppressed.untilWindowCloses(Suppressed.BufferConfig.unbounded().shutDownWhenFull()));
+
+            productSummary.toStream() //convert KTable to KStream
+                    .foreach( (key, aggregation) -> {
+                                System.out.println("Received Summary :" +
+                                        " Window = " + key.window().startTime() +
+                                        " Product =" + key.key() +
+                                        " Value = " + aggregation.getTotalValue());
+
+                                //Write to order_summary table
+                                dbUpdater.insertSummary(
+                                        key.window().startTime().toString(),
+                                        key.key(),
+                                        aggregation.getTotalValue()
+                                );
+                            }
+                    );
+
+            //Create final topology and print
+            final Topology topology = streamsBuilder.build();
+            System.out.println(topology.describe());
+
+            //Setup Stream
+            final KafkaStreams streams = new KafkaStreams(topology, props);
+
+            final CountDownLatch latch = new CountDownLatch(1);
+
+            // attach shutdown handler to catch control-c
+            Runtime.getRuntime().addShutdownHook(new Thread("streams-shutdown-hook") {
+                @Override
+                public void run() {
+                    System.out.println("Shutdown called..");
+                    streams.close();
+                    latch.countDown();
+                }
+            });
+
+            //Start the stream
+            streams.start();
+            //Await termination
+            latch.await();
+        } catch(Exception e) {
+            System.out.println("Exception at" + e);
+        }
+    }
+}
+```
