@@ -624,6 +624,10 @@ touch client-ssl.properties
 docker run -d -p 3306:3306 --name mysql-docker-container -e MYSQL_ROOT_PASSWORD=streaming -e MYSQL_DATABASE=streaming -e MYSQL_USER=streaming -e MYSQL_PASSWORD=streaming mysql/mysql-server:latest
 
 ./kafka-topics.sh --bootstrap-server localhost:9092 --topic streaming.orders.input --create --partitions 3 --replication-factor 1
+
+./kafka-topics.bat --bootstrap-server localhost:9092 --topic streaming.alerts.critical --create --partitions 3 --replication-factor 1
+./kafka-topics.bat --bootstrap-server localhost:9092 --topic streaming.alerts.highvolume --create --partitions 3 --replication-factor 1
+./kafka-topics.bat --bootstrap-server localhost:9092 --topic streaming.alerts.input --create --partitions 3 --replication-factor 1
 ```
 
 ```sql
@@ -1147,6 +1151,388 @@ public class StreamingAnalytics {
         } catch(Exception e) {
             System.out.println("Exception at" + e);
         }
+    }
+}
+```
+
+#### Streaming alert
+
+![Alert](https://raw.githubusercontent.com/matebence/spring/kafka/docs/alert.png)
+
+```java
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Alert {
+
+    @Getter
+    @Setter
+    private Timestamp timestamp;
+
+    @Getter
+    @Setter
+    private String level;
+
+    @Getter
+    @Setter
+    private String code;
+
+    @Getter
+    @Setter
+    private String mesg;
+}
+```
+
+```java
+public class ClassDeSerializer<T> implements Deserializer<T> {
+
+    private final Gson gson =
+            new GsonBuilder()
+                    .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+                    .create();
+
+    private Class<T> destinationClass;
+    private Type reflectionTypeToken;
+
+    /** Default constructor needed by Kafka */
+    public ClassDeSerializer(Class<T> destinationClass) {
+        this.destinationClass = destinationClass;
+    }
+
+    public ClassDeSerializer(Type reflectionTypeToken) {
+        this.reflectionTypeToken = reflectionTypeToken;
+    }
+
+    @Override
+    public void configure(Map<String, ?> props, boolean isKey) {}
+
+    @Override
+    public T deserialize(String topic, byte[] bytes) {
+        if (bytes == null) {
+            return null;
+        }
+        Type type = destinationClass != null ? destinationClass : reflectionTypeToken;
+        return gson.fromJson(new String(bytes), type);
+    }
+
+    @Override
+    public void close() {}
+}
+```
+
+```java
+public class ClassSerializer<T> implements Serializer<T> {
+
+    private final Gson gson =
+            new GsonBuilder()
+                    .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
+                    .create();
+
+    public ClassSerializer() {}
+
+    @Override
+    public void configure(Map<String, ?> props, boolean isKey) {}
+
+    @Override
+    public byte[] serialize(String topic, T type) {
+        return gson.toJson(type).getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public void close() {}
+}
+```
+
+```java
+public class KafkaAlertsDataGenerator implements Runnable {
+
+    public static final String ANSI_RESET = "\u001B[0m";
+    public static final String ANSI_GREEN = "\u001B[32m";
+    public static final String ANSI_PURPLE = "\u001B[35m";
+    public static final String ANSI_BLUE = "\u001B[34m";
+
+    public static final String TOPIC = "streaming.alerts.input";
+    public static final String TOPIC_CRITICAL = "streaming.alerts.critical";
+
+    public static void main(String[] args) {
+        KafkaAlertsDataGenerator kodg = new KafkaAlertsDataGenerator();
+        kodg.run();
+    }
+
+    public void run() {
+        try {
+
+            System.out.println("Starting Kafka Alerts Generator..");
+            //Wait for the main flow to be setup.
+            Thread.sleep(5000);
+
+            //Setup Kafka Client
+            Properties kafkaProps = new Properties();
+            kafkaProps.put("bootstrap.servers","localhost:9092");
+
+            kafkaProps.put("key.serializer",
+                    "org.apache.kafka.common.serialization.StringSerializer");
+            kafkaProps.put("value.serializer",
+                    "org.apache.kafka.common.serialization.StringSerializer");
+
+            Producer<String,String> myProducer
+                    = new KafkaProducer<>(kafkaProps);
+
+            //Define list of Exception Levels
+            List<String> levels = new ArrayList<>();
+            levels.add("CRITICAL");
+            levels.add("HIGH");
+            levels.add("ELEVATED");
+
+            //Define list of exception codes
+            List<String> codes = new ArrayList<>();
+            codes.add("100");
+            codes.add("200");
+            codes.add("300");
+            codes.add("400");
+
+            //Define a random number generator
+            Random random = new Random();
+
+            //Create a record key using the system timestamp.
+            int recKey = (int)Math.floor(System.currentTimeMillis()/1000);
+
+            //Generate 100 sample exception messages
+            for(int i=0; i < 100; i++) {
+
+                recKey++;
+
+                //Capture current timestamp
+                Timestamp currTimeStamp = new Timestamp(System.currentTimeMillis());
+                //Get a random Exception Level
+                String thisLevel = levels.get(random.nextInt(levels.size()));
+                //Get a random Exception code
+                String thisCode = codes.get(random.nextInt(codes.size()));
+
+                //Form a CSV. Use a dummy exception message
+                String value= "\"" + currTimeStamp + "\","
+                        +  "\"" + thisLevel + "\","
+                        +  "\"" + thisCode + "\","
+                        +  "\"This is a " + thisLevel + " alert\"" ;
+
+                System.out.println(value);
+
+                //Create the producer record
+                ProducerRecord<String, String> record =
+                        new ProducerRecord<>(
+                                TOPIC,
+                                String.valueOf(recKey),
+                                value);
+
+                //Send data to Kafka
+                RecordMetadata rmd = myProducer.send(record).get();
+
+                System.out.println(ANSI_PURPLE +
+                        "Kafka Orders Stream Generator : Sending Event : "
+                        + String.join(",", value)  + ANSI_RESET);
+
+                //Sleep for a random time ( 1 - 2 secs) before the next record.
+                Thread.sleep(random.nextInt(1000) + 1000);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+```java
+public class StreamingThresholdsAndAlerts {
+
+    public static void main(String args[]) {
+        //Initiate the Kafka Alerts Generator
+        KafkaAlertsDataGenerator alertsGenerator = new KafkaAlertsDataGenerator();
+        Thread genThread = new Thread(alertsGenerator);
+        genThread.start();
+
+        System.out.println("******** Starting Streaming  *************");
+
+        try {
+            //Setup Serializer / DeSerializer for used Data types
+            final Serde<Long> longSerde = Serdes.Long();
+            final Serde<String> stringSerde = Serdes.String();
+            final Serde<Alert> alertSerde = Serdes.serdeFrom(new ClassSerializer<>(), new ClassDeSerializer<>(Alert.class));
+
+            //Setup Properties for the Kafka Input Stream
+            Properties props = new Properties();
+            props.put(StreamsConfig.APPLICATION_ID_CONFIG,
+                    "alerts-and-thresholds-pipe");
+            props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
+                    "localhost:9092");
+            props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
+                    Serdes.String().getClass());
+            props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+                    Serdes.String().getClass());
+            props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
+            //For immediate results during testing
+            props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
+            props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 100);
+
+            //Initiate the Kafka Streams Builder
+            final StreamsBuilder streamsBuilder = new StreamsBuilder();
+
+            //Create the source node for Alerts
+            KStream<String, String> alertInput = streamsBuilder.stream(KafkaAlertsDataGenerator.TOPIC, Consumed.with(stringSerde, stringSerde));
+
+            //Convert value to an Alert Object
+            KStream<String, Alert> alertObject = alertInput.mapValues(value -> {
+                String[] values = value
+                        .replaceAll("\"","")
+                        .split(",");
+
+                Alert alert = new Alert();
+
+                alert.setTimestamp(Timestamp.valueOf(values[0]));
+                alert.setLevel(values[1]);
+                alert.setCode(values[2]);
+                alert.setMesg(values[3]);
+
+                System.out.println("Received Alert :" + alert);
+
+                return alert;
+            });
+
+            //Filter Critical Alerts and Publish to an outgoing topic
+            alertObject.filter((key, value) -> value.getLevel().equals("CRITICAL"))
+                    .mapValues(alert -> "\"" + alert.getTimestamp() + "\"," +
+                            "\"" + alert.getCode() + "\"," +
+                            "\"" + alert.getMesg() + "\"")
+                    .to(KafkaAlertsDataGenerator.TOPIC_CRITICAL);
+
+            //Create a tumbling window of 10 seconds
+            TimeWindows tumblingWindow = TimeWindows
+                    .of(Duration.ofSeconds(10))
+                    .grace(Duration.ZERO);
+
+            //Aggregate by Code and window
+            KTable<Windowed<String>,Long> codeCounts
+                    = alertObject.groupBy( //Group by Code
+                            (key,value) -> value.getCode(),
+                            Grouped.with(stringSerde,alertSerde))
+                    .windowedBy(tumblingWindow)
+                    .count(Materialized.as("code-counts")) //Count Records
+                    .suppress(Suppressed.untilWindowCloses(Suppressed.BufferConfig.unbounded().shutDownWhenFull()));
+
+            codeCounts.toStream()
+                    .peek((key,value) -> System.out.println("Summary record :" + key + " = " + value))
+                    .filter((key, value)  -> value > 2) //Filter for high volume alerts
+                    .map(  //Convert key and value to String for publishing
+                            new KeyValueMapper<Windowed<String>,
+                                    Long, KeyValue<String, String>>() {
+                                @Override
+                                public KeyValue<String, String>
+                                apply(Windowed<String> key, Long value) {
+
+                                    String returnKey = key.toString();
+                                    String returnVal = "\"" + key.window().startTime() + "\"," +
+                                            "\"" + key.key() + "\"," +
+                                            "\"" + value.toString() + "\"";
+
+                                    System.out.println("High Volume Alert : "
+                                            + returnVal);
+                                    return new KeyValue<>(returnKey, returnVal);
+                                }
+                            }
+                    ).to("streaming.alerts.highvolume"); //Publish to outgoing topic.
+
+            /**************************************************
+             * Create a pipe and execute
+             **************************************************/
+            // Create final topology and print
+            final Topology topology = streamsBuilder.build();
+            System.out.println(topology.describe());
+
+            // Setup Stream
+            final KafkaStreams streams = new KafkaStreams(topology, props);
+
+            // Reset for the example. Not recommended for production
+            final CountDownLatch latch = new CountDownLatch(1);
+
+            // attach shutdown handler to catch control-c
+            Runtime.getRuntime().addShutdownHook(new Thread("streams-shutdown-hook") {
+                @Override
+                public void run() {
+                    System.out.println("Shutdown called..");
+                    streams.close();
+                    latch.countDown();
+                }
+            });
+
+            //Start the stream
+            streams.start();
+            //Await termination
+            latch.await();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+### Transition to Spring
+
+```xml
+<dependency>
+    <groupId>org.springframework.kafka</groupId>
+    <artifactId>spring-kafka</artifactId>
+    <version>2.7.8</version>
+</dependency>
+<dependency>
+    <groupId>org.apache.kafka</groupId>
+    <artifactId>kafka-streams</artifactId>
+    <version>2.7.1</version>
+</dependency> 
+```
+
+```java
+@Configuration
+@EnableKafka
+@EnableKafkaStreams
+public class KafkaConfig {
+
+    @Value(value = "${spring.kafka.bootstrap-servers}")
+    private String bootstrapAddress;
+
+    @Bean(name = KafkaStreamsDefaultConfiguration.DEFAULT_STREAMS_CONFIG_BEAN_NAME)
+    KafkaStreamsConfiguration kStreamsConfig() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(APPLICATION_ID_CONFIG, "streams-app");
+        props.put(BOOTSTRAP_SERVERS_CONFIG, bootstrapAddress);
+        props.put(DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
+        props.put(DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass().getName());
+
+        return new KafkaStreamsConfiguration(props);
+    }
+
+    // other config
+}
+```
+
+```java
+@Component
+public class WordCountProcessor {
+
+    private static final Serde<String> STRING_SERDE = Serdes.String();
+
+    @Autowired
+    void buildPipeline(StreamsBuilder streamsBuilder) {
+        KStream<String, String> messageStream = streamsBuilder
+          .stream("input-topic", Consumed.with(STRING_SERDE, STRING_SERDE));
+
+        KTable<String, Long> wordCounts = messageStream
+          .mapValues((ValueMapper<String, String>) String::toLowerCase)
+          .flatMapValues(value -> Arrays.asList(value.split("\\W+")))
+          .groupBy((key, word) -> word, Grouped.with(STRING_SERDE, STRING_SERDE))
+          .count();
+
+        wordCounts.toStream().to("output-topic");
     }
 }
 ```
