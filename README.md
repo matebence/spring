@@ -501,16 +501,16 @@ public class Consumer {
 - retry.backoff.ms - The time to wait before attempting to retry a failed request to a given topic partition
 
 ```bash
-.\zookeeper-server-start.bat ..\..\config\zookeeper.properties
-.\kafka-server-start.bat ..\..\config\server-0.properties
-.\kafka-server-start.bat ..\..\config\server-1.properties
+.\zookeeper-server-start.sh ..\..\config\zookeeper.properties
+.\kafka-server-start.sh ..\..\config\server-0.properties
+.\kafka-server-start.sh ..\..\config\server-1.properties
 ```
 
 ```bash
-.\kafka-topics.bat --bootstrap-server localhost:9092 --topic library-events.RETRY --create --partitions 3 --replication-factor 1
-.\kafka-topics.bat --bootstrap-server localhost:9092 --topic library-events.DLT --create --partitions 3 --replication-factor 1
-.\kafka-topics.bat --bootstrap-server localhost:9092 --topic library-events --create --partitions 3 --replication-factor 1
-.\kafka-console-consumer.bat --bootstrap-server localhost:9092 --topic library-events --from-beginning
+.\kafka-topics.sh --bootstrap-server localhost:9092 --topic library-events.RETRY --create --partitions 3 --replication-factor 1
+.\kafka-topics.sh --bootstrap-server localhost:9092 --topic library-events.DLT --create --partitions 3 --replication-factor 1
+.\kafka-topics.sh --bootstrap-server localhost:9092 --topic library-events --create --partitions 3 --replication-factor 1
+.\kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic library-events --from-beginning
 ```
 
 #### POST WITH-NULL-LIBRARY-EVENT-ID
@@ -621,13 +621,20 @@ touch client-ssl.properties
 ### Kafka Design patterns
 
 ```bash
+docker run --name streaming-redis -p 6379:6379 -d redis
+
 docker run -d -p 3306:3306 --name mysql-docker-container -e MYSQL_ROOT_PASSWORD=streaming -e MYSQL_DATABASE=streaming -e MYSQL_USER=streaming -e MYSQL_PASSWORD=streaming mysql/mysql-server:latest
 
 ./kafka-topics.sh --bootstrap-server localhost:9092 --topic streaming.orders.input --create --partitions 3 --replication-factor 1
 
-./kafka-topics.bat --bootstrap-server localhost:9092 --topic streaming.alerts.critical --create --partitions 3 --replication-factor 1
-./kafka-topics.bat --bootstrap-server localhost:9092 --topic streaming.alerts.highvolume --create --partitions 3 --replication-factor 1
-./kafka-topics.bat --bootstrap-server localhost:9092 --topic streaming.alerts.input --create --partitions 3 --replication-factor 1
+./kafka-topics.sh --bootstrap-server localhost:9092 --topic streaming.alerts.critical --create --partitions 3 --replication-factor 1
+./kafka-topics.sh --bootstrap-server localhost:9092 --topic streaming.alerts.highvolume --create --partitions 3 --replication-factor 1
+./kafka-topics.sh --bootstrap-server localhost:9092 --topic streaming.alerts.input --create --partitions 3 --replication-factor 1
+
+./kafka-topics.sh --bootstrap-server localhost:9092 --topic streaming.leaderboards.input --create --partitions 3 --replication-factor 1
+
+./kafka-topics.sh --bootstrap-server localhost:9092 --topic streaming.sentiment.input --create --partitions 3 --replication-factor 1
+./kafka-topics.shs --bootstrap-server localhost:9092 --topic streaming.sentiment.output --create --partitions 3 --replication-factor 1
 ```
 
 ```sql
@@ -1468,6 +1475,540 @@ public class StreamingThresholdsAndAlerts {
             //Start the stream
             streams.start();
             //Await termination
+            latch.await();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+#### Leaderboard
+
+![Alert](https://raw.githubusercontent.com/matebence/spring/kafka/docs/leaderboard.png)
+
+```java
+public class RedisManager implements Runnable {
+
+    public static final String ANSI_RESET = "\u001B[0m";
+    public static final String ANSI_GREEN = "\u001B[32m";
+    public static final String ANSI_PURPLE = "\u001B[35m";
+    public static final String ANSI_BLUE = "\u001B[34m";
+
+    private static String lbKey = "player-leaderboard";
+
+    private Jedis jedis;
+
+    public static void main(String[] args) {
+
+        RedisManager rmgr = new RedisManager();
+        rmgr.setUp();
+        Thread testThread = new Thread(rmgr);
+        testThread.start();
+
+        //Testing the leaderboard.
+        //Redis connections are not threadsafe.
+        //Open new connection for writing.
+        Jedis jedisWriter = new Jedis("localhost");
+        try {
+            jedisWriter.zincrby(lbKey,2,"Mouse");
+            jedisWriter.zincrby(lbKey,3,"Keyboard");
+            Thread.sleep(6000);
+            jedisWriter.zincrby(lbKey,1,"Monitor");
+            jedisWriter.zincrby(lbKey,2,"Mouse");
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    //Create a connection and reset the leaderboard
+    public void setUp() {
+        try{
+            //Jedis running on localhost and port 6379
+            jedis =new Jedis("localhost");
+            //reset the sorted set key
+            jedis.del(lbKey);
+            System.out.println("Redis connection setup successfully");
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void update_score(String product, double count) {
+        jedis.zincrby(lbKey,count,product);
+    }
+
+    public void run() {
+        try {
+            while (true) {
+                //Query the leaderboard and print the results
+                Set<Tuple> scores= jedis.zrevrangeWithScores(lbKey,0,-1);
+
+                Iterator<Tuple> iScores = scores.iterator();
+                int position=1;
+
+                while (iScores.hasNext()) {
+                    Tuple score= iScores.next();
+                    System.out.println(
+                            ANSI_BLUE + "Leaderboard - " + position + " : "
+                                    +  score.getElement() + " = " + score.getScore()
+                                    + ANSI_RESET);
+                    position++;
+                }
+
+                Thread.sleep(5000);
+            }
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+```java
+public class KafkaGamingDataGenerator implements Runnable {
+
+    public static final String ANSI_RESET = "\u001B[0m";
+    public static final String ANSI_GREEN = "\u001B[32m";
+    public static final String ANSI_PURPLE = "\u001B[35m";
+    public static final String ANSI_BLUE = "\u001B[34m";
+
+    public static final String topic = "streaming.leaderboards.input";
+
+    public static void main(String[] args) {
+        KafkaGamingDataGenerator kodg = new KafkaGamingDataGenerator();
+        kodg.run();
+    }
+
+    public void run() {
+        try {
+            System.out.println("Starting Kafka Gaming Generator..");
+            //Wait for the main flow to be setup.
+            Thread.sleep(5000);
+
+            //Setup Kafka Client
+            Properties kafkaProps = new Properties();
+            kafkaProps.put("bootstrap.servers","localhost:9092");
+
+            kafkaProps.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+            kafkaProps.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+
+            Producer<String,String> myProducer = new KafkaProducer<>(kafkaProps);
+
+            //Define list of players
+            List<String> players = new ArrayList<>();
+            players.add("Bob");
+            players.add("Mike");
+            players.add("Kathy");
+            players.add("Sam");
+
+            //Define a random number generator
+            Random random = new Random();
+
+            //Generate 100 sample order records
+            for(int i=0; i < 100; i++) {
+
+                //Generate a random player & score
+                String player =players.get(random.nextInt(players.size()));
+                int score = random.nextInt(10) + 1;
+
+                //Use player as key. Each player will go to the same partition
+                //Hence the updates for a given player are sequencial
+                String recKey = String.valueOf(player);
+                String value = String.valueOf(score);
+
+                ProducerRecord<String, String> record =
+                        new ProducerRecord<>(
+                                topic,
+                                recKey,
+                                value);
+
+                RecordMetadata rmd = myProducer.send(record).get();
+
+                System.out.println(ANSI_PURPLE +
+                        "Kafka Gaming Stream Generator : Sending Event : "
+                        + recKey + " = " + value  + ANSI_RESET);
+
+                //Sleep for a random time ( 1 - 3 secs) before the next record.
+                Thread.sleep(random.nextInt(2000) + 1000);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+```java
+public class StreamingLeaderboards {
+
+    public static void main(String[] args) {
+        //Initiate  RedisTracker to print 5 sec leader positions
+        RedisManager redisTracker = new RedisManager();
+        redisTracker.setUp();
+        Thread redisThread = new Thread(redisTracker);
+        redisThread.start();
+
+        //Initiate RedisUpdater to be used for updating the leaderboard
+        RedisManager redisUpdater = new RedisManager();
+        redisUpdater.setUp();
+
+        //Initiate the Kafka Gaming data Generator
+        KafkaGamingDataGenerator gamingGenerator = new KafkaGamingDataGenerator();
+        Thread genThread = new Thread(gamingGenerator);
+        genThread.start();
+
+        System.out.println("******** Starting Streaming  *************");
+
+        try {
+            /**************************************************
+             * Build a Kafka Topology
+             **************************************************/
+
+            //Setup Serializer / DeSerializer for used Data types
+            final Serde<String> stringSerde = Serdes.String();
+            final Serde<Long> longSerde = Serdes.Long();
+
+            //Setup Properties for the Kafka Input Stream
+            Properties props = new Properties();
+            props.put(StreamsConfig.APPLICATION_ID_CONFIG,
+                    "leaderboards-pipe");
+            props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
+                    "localhost:9092");
+            props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
+                    Serdes.String().getClass());
+            props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+                    Serdes.String().getClass());
+            props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
+            //For immediate results during testing
+            props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
+            props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 100);
+
+            //Initiate the Kafka Streams Builder
+            final StreamsBuilder builder = new StreamsBuilder();
+
+            //Create the source node for Gaming data
+            KStream<String, String> gamingInput = builder.stream("streaming.leaderboards.input", Consumed.with(stringSerde, stringSerde));
+
+            gamingInput.peek( (player, score) -> System.out.println("Received Score : Player = " + player + ", Score = " + score));
+
+            //Update the Redis key with the new score increment
+            gamingInput.foreach((product,score) -> redisUpdater.update_score(product, Double.parseDouble(score)));
+
+            /**************************************************
+             * Create a pipe and execute
+             **************************************************/
+            //Create final topology and print
+            final Topology topology = builder.build();
+            System.out.println(topology.describe());
+
+            //Setup Stream
+            final KafkaStreams streams = new KafkaStreams(topology, props);
+            final CountDownLatch latch = new CountDownLatch(1);
+
+            // attach shutdown handler to catch control-c
+            Runtime.getRuntime().addShutdownHook(new Thread("streams-shutdown-hook") {
+                @Override
+                public void run() {
+                    System.out.println("Shutdown called..");
+                    streams.close();
+                    latch.countDown();
+                }
+            });
+
+            streams.start();
+            latch.await();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+#### Real time prediction
+
+![Alert](https://raw.githubusercontent.com/matebence/spring/kafka/docs/real_time.png)
+
+```txt
+Movie was perfectly balanced with emotion,fun and entertainment
+This movie is a waste of time.
+I loved the movie. Each and every thing in the movie done fantastically.
+Awesome story line and direction with a simple and nice message for audience
+A great movie with a mixture of every genre. A must watch and a delight
+I have watched this movie, the acting and the story plot is pathetic and unconvincing.
+It was really one of the most boring films I watched.
+Please don't believe the high rated reviews.. Not worth the time
+It is an inspirational movie with lots of fun.
+Forget the critics just go with your friends and watch it.It will bring a big smile on your face.
+```
+
+```java
+public class RunLocalWebServer {
+
+    private HttpServer server;
+
+    public static void main(String[] args) {
+        try {
+            RunLocalWebServer localServer = new RunLocalWebServer();
+            localServer.startServer();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void startServer() throws Exception{
+        System.out.println("Starting Web Server to server sentiments..");
+
+        server = HttpServer.create(new InetSocketAddress("localhost", 8001), 0);
+
+        ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(10);
+
+        //Sentiment handler uses the SentimentHTTPHandler class
+        server.createContext("/sentiment", new SentimentHTTPHandler());
+        server.setExecutor(threadPoolExecutor);
+        server.start();
+        System.out.println("Started Local web server");
+    }
+}
+```
+
+```java
+public class SentimentHTTPHandler implements HttpHandler {
+
+    //Handle an incoming request
+    public void handle(HttpExchange exchange) throws IOException {
+        String inputStr= IOUtils.toString(exchange.getRequestBody());
+        System.out.println("Received input "+  inputStr);
+
+        //Get sentiment
+        String sentiment = getSentiment(inputStr);
+
+        //Write response to output
+        exchange.getResponseHeaders().add("Content-Type", "text/html");
+        exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, sentiment.length());
+        IOUtils.write(sentiment, exchange.getResponseBody());
+
+        System.out.println("Returning Sentiment " + sentiment);
+
+        exchange.close();
+    }
+
+    public String getSentiment(String text) {
+
+        String[] sentiments = {"Very Negative", "Negative",
+                "Neutral", "Positive", "Very Positive"};
+
+        Properties props = new Properties();
+        //Neutral by default
+        int prediction_class = 2;
+
+        System.out.println("Doing Sentiment Analysis");
+
+        //Setup sentiment  pipeline
+        props.setProperty("annotators",
+                "tokenize, ssplit, pos, parse, sentiment");
+
+        StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
+
+        //Find sentiment
+        Annotation annotation = pipeline.process(text);
+
+        System.out.println("Pipeline processed");
+
+        //Extract sentiment
+        for (CoreMap sentence : annotation.get(CoreAnnotations.SentencesAnnotation.class)) {
+            Tree tree = sentence.get(SentimentCoreAnnotations.SentimentAnnotatedTree.class);
+            prediction_class = RNNCoreAnnotations.getPredictedClass(tree);
+        }
+        System.out.println("Got sentiment : " + prediction_class);
+        return sentiments[prediction_class];
+    }
+
+    public static void main(String[] args) {
+        SentimentHTTPHandler thh = new SentimentHTTPHandler();
+        System.out.println(thh.getSentiment("Hello how are you doing"));
+    }
+}
+```
+
+```java
+public class SentimentPredictor {
+
+    public static void main(String[] args) {
+        System.out.println(SentimentPredictor.getSentiment("how are you"));
+    }
+
+    //Call Sentiment Service and return results
+    public static String getSentiment(String review) {
+
+        CloseableHttpClient httpClient = HttpClients.createDefault();
+
+        try {
+            HttpPost request = new HttpPost("http://localhost:8001/sentiment");
+            request.setEntity(new StringEntity(review));
+            CloseableHttpResponse response = httpClient.execute(request);
+
+            return EntityUtils.toString(response.getEntity());
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+            return "Error";
+        }
+    }
+}
+```
+
+```java
+public class KafkaReviewsDataGenerator implements Runnable {
+
+    public static final String ANSI_RESET = "\u001B[0m";
+    public static final String ANSI_GREEN = "\u001B[32m";
+    public static final String ANSI_PURPLE = "\u001B[35m";
+    public static final String ANSI_BLUE = "\u001B[34m";
+
+    public static final String topic = "streaming.sentiment.input";
+
+    public static void main(String[] args) {
+        KafkaReviewsDataGenerator kodg = new KafkaReviewsDataGenerator();
+        kodg.run();
+    }
+
+    public void run() {
+        try {
+            System.out.println("Starting Kafka Movie review Generator..");
+            //Wait for the main flow to be setup.
+            Thread.sleep(5000);
+
+            //Setup Kafka Client
+            Properties kafkaProps = new Properties();
+            kafkaProps.put("bootstrap.servers","localhost:9092");
+
+            kafkaProps.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+            kafkaProps.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+
+            Producer<String,String> myProducer
+                    = new KafkaProducer<>(kafkaProps);
+
+            //Define a random number generator
+            Random random = new Random();
+
+            //Get reviews from the movie-reviews.txt file
+            Scanner scanner = new Scanner(new File("src/main/resources/movie-reviews.txt"));
+
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine();
+
+                int reviewId = (int)Math.floor(System.currentTimeMillis()/1000);
+
+                //Publish the review
+                ProducerRecord<String, String> record =
+                        new ProducerRecord<>(
+                                topic,
+                                String.valueOf(reviewId),
+                                line);
+
+                RecordMetadata rmd = myProducer.send(record).get();
+
+                System.out.println(ANSI_PURPLE + "Kafka Reviews Stream Generator : Sending Event : " + reviewId + " = " + line  + ANSI_RESET);
+
+                //Sleep for a random time ( 1 - 3 secs) before the next record.
+                Thread.sleep(random.nextInt(2000) + 1000);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+```java
+public class StreamingPredictions {
+
+    public static void main(String[] args) {
+        //Initiate the Kafka Reviews data Generator
+        KafkaReviewsDataGenerator reviewsGenerator = new KafkaReviewsDataGenerator();
+        Thread genThread = new Thread(reviewsGenerator);
+        genThread.start();
+
+        System.out.println("******** Starting Streaming  *************");
+
+        try {
+            /**************************************************
+             * Build a Kafka Topology
+             **************************************************/
+
+            //Setup Serializer / DeSerializer for used Data types
+            final Serde<String> stringSerde = Serdes.String();
+            final Serde<Long> longSerde = Serdes.Long();
+
+            //Setup Properties for the Kafka Input Stream
+            Properties props = new Properties();
+            props.put(StreamsConfig.APPLICATION_ID_CONFIG,
+                    "predictions-pipe");
+            props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
+                    "localhost:9092");
+            props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
+                    Serdes.String().getClass());
+            props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+                    Serdes.String().getClass());
+            props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+
+            //For immediate results during testing
+            props.put(StreamsConfig.CACHE_MAX_BYTES_BUFFERING_CONFIG, 0);
+            props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, 100);
+
+            //Initiate the Kafka Streams Builder
+            final StreamsBuilder builder = new StreamsBuilder();
+
+            //Create the source node for Reviews data
+            KStream<String, String> reviewsInput
+                    = builder.stream("streaming.sentiment.input", Consumed.with(stringSerde, stringSerde));
+
+            reviewsInput
+                    .peek( (key, review) -> System.out.println("Received Review : ID = " + key + ", Review = " + review));
+
+            //Call the sentiment service for each record in the stream
+            KStream<String,String> sentiments
+                    = reviewsInput
+                    .mapValues( (review) -> {
+                        String sentiment= SentimentPredictor.getSentiment(review);
+                        System.out.println("Output - " + "Sentiment= " + sentiment + " : for " + review);
+                        return sentiment;
+                    });
+
+            //Send to output topic
+            sentiments.to("streaming.sentiment.output");
+
+            /**************************************************
+             * Create a pipe and execute
+             **************************************************/
+            //Create final topology and print
+            final Topology topology = builder.build();
+            System.out.println(topology.describe());
+
+            //Setup Stream
+            final KafkaStreams streams = new KafkaStreams(topology, props);
+
+            //Reset for the example. Not recommended for production
+            streams.cleanUp();
+            final CountDownLatch latch = new CountDownLatch(1);
+
+            // attach shutdown handler to catch control-c
+            Runtime.getRuntime().addShutdownHook(
+                    new Thread("streams-shutdown-hook") {
+                        @Override
+                        public void run() {
+                            System.out.println("Shutdown called..");
+                            streams.close();
+                            latch.countDown();
+                        }
+                    });
+
+            streams.start();
             latch.await();
         } catch (Exception e) {
             e.printStackTrace();
