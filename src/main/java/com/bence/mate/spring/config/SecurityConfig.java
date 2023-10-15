@@ -1,10 +1,12 @@
 package com.bence.mate.spring.config;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.web.util.matcher.RegexRequestMatcher;
@@ -19,9 +21,12 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.context.annotation.Bean;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 import javax.sql.DataSource;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /* @EnableGlobalMethodSecurity(
@@ -43,6 +48,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 		return new BCryptPasswordEncoder();
 	}
 
+	// we configure it here
 	@Override
 	protected void configure(AuthenticationManagerBuilder auth) throws Exception {
 		auth.inMemoryAuthentication()
@@ -51,6 +57,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 				.withUser("manager").password(getBCryptPasswordEncoder().encode("manager")).roles("ROLE_MANAGER").authorities("READ");
 	}
 
+	// we configure it here
 	@Override
 	protected void configure(AuthenticationManagerBuilder auth) throws Exception {
 		auth.jdbcAuthentication().dataSource(dataSource)
@@ -59,9 +66,17 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 				.passwordEncoder(getBCryptPasswordEncoder());
 	}
 
+	// we configure it here
 	@Override
 	protected void configure(AuthenticationManagerBuilder auth) throws Exception {
 		auth.userDetailsService(userDetailsService).passwordEncoder(getBCryptPasswordEncoder());
+	}
+
+	// we expose it here
+	@Bean
+	@Override
+	public AuthenticationManager authenticationManagerBean() throws Exception {
+		return super.authenticationManagerBean();
 	}
 
 	@Override
@@ -148,16 +163,28 @@ public class SecurityConfig {
 //		return users;
 //	}
 
+// User details service is automatically picked up
+
 	@Bean
-	AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+	public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
 		return authenticationConfiguration.getAuthenticationManager();
 	}
 
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 		// The cors() method will add the Spring-provided CorsFilter to the application context, bypassing the authorization checks for OPTIONS requests.
-		return http.cors().and()
-				.csrf().disable()
+		return http.cors().configurationSource(new CorsConfigurationSource() {
+					@Override
+					public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
+						CorsConfiguration config = new CorsConfiguration();
+						config.setAllowedOrigins(Collections.singletonList("http://localhost:4200"));
+						config.setAllowedMethods(Collections.singletonList("*"));
+						config.setAllowCredentials(true);
+						config.setAllowedHeaders(Collections.singletonList("*"));
+						config.setMaxAge(3600L);
+						return config;
+					} // it will be stored in a Cookie called XSRF-TOKEN, this can be then used in a SPA app
+				}).and().csrf().ignoringRequestMatchers("/common").csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()).and()
 				.sessionManagement().sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
 				.maximumSessions(2).and()
 				// By default, Spring Security has this protection enabled (“migrateSession“). On authentication, a new HTTP Session is created, the old one is invalidated and the attributes from the old session are copied over.
@@ -185,7 +212,8 @@ public class SecurityConfig {
 
 	@Bean
 	public HttpSessionEventPublisher httpSessionEventPublisher() {
-	    return new HttpSessionEventPublisher();
+		// Concurrent Session Control
+		return new HttpSessionEventPublisher();
 	}
 	
 	@Bean

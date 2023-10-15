@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+// It is automatically exposed to the Security config
 @Service
 public class UserServiceImpl implements UserDetailsService {
 
