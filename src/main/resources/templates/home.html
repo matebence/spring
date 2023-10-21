@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="ISO-8859-1">
+    <title>Home</title>
+</head>
+<body>
+    <h3>This is the home page</h3>
+    <a sec:authorize="!isAuthenticated()" th:href="@{/login}">Login</a>
+    <br>
+    <a sec:authorize="isAuthenticated()" th:href="@{/manage}">Manage</a>
+</body>
+</html>
