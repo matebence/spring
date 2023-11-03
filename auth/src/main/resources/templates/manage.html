@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="ISO-8859-1">
+    <title>Manage</title>
+</head>
+<body>
+    <h3>This is the manage page</h3>
+
+    <section>
+        <div sec:authorize="hasRole('USER')">Text visible to user.</div>
+        <div sec:authorize="hasRole('ADMIN')">Text visible to admin.</div>
+        <div sec:authorize="isAuthenticated()">Text visible only to authenticated users.</div>
+    </section>
+
+    <section>
+        Username:
+        <div sec:authentication="principal.attributes['preferred_username']"></div>
+        First name:
+        <div sec:authentication="principal.attributes['given_name']"></div>
+        Last name:
+        <div sec:authentication="principal.attributes['family_name']"></div>
+        Email:
+        <div sec:authentication="principal.attributes['email']"></div>
+        Authorities:
+        <div sec:authentication="authorities"></div>
+    </section>
+
+    <a th:href="@{/logout}">Logout</a>
+</body>
+</html>
