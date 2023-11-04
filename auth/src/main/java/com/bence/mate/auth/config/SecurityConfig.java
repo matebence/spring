@@ -1,16 +1,21 @@
 package com.bence.mate.auth.config;
 
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.core.authority.mapping.GrantedAuthoritiesMapper;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.core.oidc.user.OidcUserAuthority;
+import com.bence.mate.auth.principal.AdditionalAuthenticationDetailsSource;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.oauth2.core.user.OAuth2UserAuthority;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import com.bence.mate.auth.handler.Oauth2AuthenticationSuccessHandler;
+import com.bence.mate.auth.provider.AdditionalAuthenticationProvider;
 import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.core.GrantedAuthority;
+import com.bence.mate.auth.service.CustomOidcUserService;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Bean;
@@ -21,16 +26,25 @@ import java.util.*;
 @Configuration
 public class SecurityConfig {
 
+    @Autowired
+    private AdditionalAuthenticationProvider additionalProvider;
+
+    @Autowired
+    private Oauth2AuthenticationSuccessHandler oauthSuccessHandler;
+
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
-        return authenticationConfiguration.getAuthenticationManager();
+    public AuthenticationManager authManager(HttpSecurity http) throws Exception {
+        AuthenticationManagerBuilder authenticationManagerBuilder = http.getSharedObject(AuthenticationManagerBuilder.class);
+        authenticationManagerBuilder.authenticationProvider(additionalProvider);
+
+        return authenticationManagerBuilder.build();
     }
 
     @Bean
     public SecurityFilterChain configure(HttpSecurity http) throws Exception {
-        return http.oauth2Client()
-                .and().oauth2Login()
-                .and().csrf().disable().sessionManagement().sessionCreationPolicy(SessionCreationPolicy.ALWAYS)
+        return http.oauth2Client() // it calls the userInfoEndpoint to obtain more data about the user
+                .and().oauth2Login().authenticationDetailsSource(new AdditionalAuthenticationDetailsSource()).successHandler(oauthSuccessHandler).userInfoEndpoint().oidcUserService(new CustomOidcUserService())
+                .and().and().csrf().disable().sessionManagement().sessionCreationPolicy(SessionCreationPolicy.ALWAYS)
                 .and().authorizeHttpRequests()
                 .requestMatchers("/", "/home", "/access-denied").permitAll()
                 .requestMatchers("/sign-in").authenticated()
