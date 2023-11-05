@@ -1,5 +1,6 @@
 package com.bence.mate.author.resource;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 
+import org.springframework.security.oauth2.jwt.Jwt;
 import com.bence.mate.author.service.AuthorService;
 import org.springframework.http.ResponseEntity;
 import com.bence.mate.author.entity.Author;
@@ -35,7 +37,8 @@ public class AuthorResource {
     }
 
     @GetMapping
-    public ResponseEntity<List<Author>> getAllAuthors() {
+    public ResponseEntity<List<Author>> getAllAuthors(@AuthenticationPrincipal Jwt principal) {
+        log.info("{}", principal.getTokenValue());
         List<Author> allAuthors = authorService.getAllAuthors();
 
         return ResponseEntity.status(HttpStatus.OK).body(allAuthors);
