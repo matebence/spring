@@ -196,6 +196,46 @@ mkdir kafka-1
 
 ### Create topics
 
+## How to create a topic ?
+
+```
+./kafka-topics.sh --create --topic test-topic -zookeeper localhost:2181 --replication-factor 1 --partitions 4
+```
+
+## How to instantiate a Console Producer?
+
+### Without Key
+
+```
+./kafka-console-producer.sh --broker-list localhost:9092 --topic test-topic
+```
+
+### With Key
+
+```
+./kafka-console-producer.sh --broker-list localhost:9092 --topic test-topic --property "key.separator=-" --property "parse.key=true"
+```
+
+## How to instantiate a Console Consumer?
+
+### Without Key
+
+```
+./kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic test-topic --from-beginning
+```
+
+### With Key
+
+```
+./kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic test-topic --from-beginning -property "key.separator= - " --property "print.key=true"
+```
+
+### With Consumer Group
+
+```
+./kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic test-topic --group <group-name>
+```
+
 ```bash
 # Show all options
 ./kafka-topics.sh
